@@ -15,6 +15,10 @@
 cmd/shortener/main
 cmd/shortener/shortener
 
+# Storage
+
+internal/storage
+
 # Dependency directories (remove the comment below to include it)
 vendor/
 
