@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	//"strings"
+	"strings"
 )
 
 const LocalHost = "http://localhost"
@@ -37,54 +37,53 @@ func getShortURL(linkID string) string {
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
-	//contentType := req.Header.Get("Content-Type")
-	//_, errBody := io.ReadAll(req.Body)
+	contentType := req.Header.Get("Content-Type")
+	_, errBody := io.ReadAll(req.Body)
 
-	//if strings.Contains(contentType, "text/plain") && errBody == nil {
-	// Пришел ид
-	linkData := files.JSONDataGet{}
-	requestID := req.URL.String()
-	requestID = requestID[1:]
-	linkData.ID = requestID
-	// Проверяем, есть ли он.
-	linkData.Get(LinkFile)
-	if linkData.Link != "" {
-		// Если есть, отдаем 307 редирект
-		TempRedirect(res, req, linkData.Link)
+	if strings.Contains(contentType, "text/plain") && errBody == nil {
+		// Пришел ид
+		linkData := files.JSONDataGet{}
+		requestID := req.URL.String()
+		requestID = requestID[1:]
+		linkData.ID = requestID
+		// Проверяем, есть ли он.
+		linkData.Get(LinkFile)
+		if linkData.Link != "" {
+			// Если есть, отдаем 307 редирект
+			TempRedirect(res, req, linkData.Link)
+		} else {
+			// Если нет, отдаем BadRequest
+			BadRequest(res)
+		}
 	}
-	//else {
-	//	// Если нет, отдаем BadRequest
-	//	BadRequest(res)
-	//}
-	//}
 }
 
 func handlePOST(res http.ResponseWriter, req *http.Request) {
-	//currentPath := req.URL.Path
-	//contentType := req.Header.Get("Content-Type")
-	contentBody, _ := io.ReadAll(req.Body)
-	//if currentPath == "/" && strings.Contains(contentType, "text/plain") && errBody == nil {
-	// Пришел урл
-	linkID := rand.RandStringBytes(8)
-	linkDataGet := files.JSONDataGet{}
-	linkDataGet.Link = string(contentBody)
-	// Проверяем, есть ли он (пока без валидаций).
-	linkDataGet.Get(LinkFile)
-	shortLink := linkDataGet.ShortLink
-	// Если нет, генерим ид, сохраняем
-	if linkDataGet.ID == "" {
-		linkDataSet := files.JSONDataSet{}
-		linkDataSet.Link = string(contentBody)
-		linkDataSet.ShortLink = getShortURL(linkID)
-		linkDataSet.ID = linkID
-		linkDataSet.Set(LinkFile)
-		shortLink = linkDataSet.ShortLink
+	currentPath := req.URL.Path
+	contentType := req.Header.Get("Content-Type")
+	contentBody, errBody := io.ReadAll(req.Body)
+	if currentPath == "/" && strings.Contains(contentType, "text/plain") && errBody == nil {
+		// Пришел урл
+		linkID := rand.RandStringBytes(8)
+		linkDataGet := files.JSONDataGet{}
+		linkDataGet.Link = string(contentBody)
+		// Проверяем, есть ли он (пока без валидаций).
+		linkDataGet.Get(LinkFile)
+		shortLink := linkDataGet.ShortLink
+		// Если нет, генерим ид, сохраняем
+		if linkDataGet.ID == "" {
+			linkDataSet := files.JSONDataSet{}
+			linkDataSet.Link = string(contentBody)
+			linkDataSet.ShortLink = getShortURL(linkID)
+			linkDataSet.ID = linkID
+			linkDataSet.Set(LinkFile)
+			shortLink = linkDataSet.ShortLink
+		}
+		// Отдаем 201 ответ с шортлинком
+		Created(res, shortLink)
+	} else {
+		BadRequest(res)
 	}
-	// Отдаем 201 ответ с шортлинком
-	Created(res, shortLink)
-	//} else {
-	//	BadRequest(res)
-	//}
 }
 
 func handleOther(res http.ResponseWriter, req *http.Request) {
