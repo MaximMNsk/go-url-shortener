@@ -24,8 +24,12 @@ func Created(w http.ResponseWriter, addData string) {
 	}
 }
 
-func getShortUrl(linkId string) string {
-	return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkId)
+func TempRedirect(w http.ResponseWriter, req *http.Request, addData string) {
+	http.Redirect(w, req, addData, http.StatusTemporaryRedirect)
+}
+
+func getShortURL(linkID string) string {
+	return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
 }
 
 func handleMainPage(res http.ResponseWriter, req *http.Request) {
@@ -37,42 +41,43 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	if currentMethod == "POST" {
 		if currentPath == "/" && contentType == "text/plain" && errBody == nil {
 			// Пришел урл
-			linkId := rand.RandStringBytes(8)
-			linkData := files.JsonData{}
-			linkData.Link = string(contentBody)
+			linkID := rand.RandStringBytes(8)
+			linkDataGet := files.JSONDataGet{}
+			linkDataGet.Link = string(contentBody)
 			// Проверяем, есть ли он (пока без валидаций).
-			linkData.Get(LinkFile)
+			linkDataGet.Get(LinkFile)
+			shortLink := linkDataGet.ShortLink
 			// Если нет, генерим ид, сохраняем
-			if linkData.Id == "" {
-				linkData.ShortLink = getShortUrl(linkId)
-				linkData.Id = linkId
-				linkData.Set(LinkFile)
+			if linkDataGet.ID == "" {
+				linkDataSet := files.JSONDataSet{}
+				linkDataSet.Link = string(contentBody)
+				linkDataSet.ShortLink = getShortURL(linkID)
+				linkDataSet.ID = linkID
+				linkDataSet.Set(LinkFile)
+				shortLink = linkDataSet.ShortLink
 			}
-			// Отдаем 307 редирект
-			http.Redirect(res, req, linkData.ShortLink, 307)
+			// Отдаем 201 ответ с шортлинком
+			Created(res, shortLink)
 		} else {
 			BadRequest(res)
 		}
 	} else if currentMethod == "GET" {
 		if contentType == "text/plain" && errBody == nil {
 			// Пришел ид
-			linkData := files.JsonData{}
-			requestId := req.URL.String()
-			requestId = requestId[1:]
-			//fmt.Println(requestId)
-			linkData.Id = requestId
+			linkData := files.JSONDataGet{}
+			requestID := req.URL.String()
+			requestID = requestID[1:]
+			linkData.ID = requestID
 			// Проверяем, есть ли он.
 			linkData.Get(LinkFile)
 			if linkData.Link != "" {
-				// Если есть, отдаем 201 ответ с шортлинком
-				Created(res, linkData.ShortLink)
+				// Если есть, отдаем 307 редирект
+				TempRedirect(res, req, linkData.Link)
 			} else {
 				// Если нет, отдаем BadRequest
 				BadRequest(res)
 			}
-
 		}
-
 	} else {
 		BadRequest(res)
 	}

@@ -2,23 +2,26 @@ package files
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 )
 
-type JsonData struct {
+type JSONDataGet struct {
 	Link      string
 	ShortLink string
-	Id        string
+	ID        string
 }
 
-func (jsonData *JsonData) Get(fileName string) {
-	var savedData []JsonData
+type JSONDataSet JSONDataGet
+
+func (jsonData *JSONDataGet) Get(fileName string) {
+	var savedData []JSONDataGet
 	jsonString := getData(fileName)
 	_ = json.Unmarshal([]byte(jsonString), &savedData)
 	for _, v := range savedData {
-		if v.Id == jsonData.Id || v.Link == jsonData.Link {
-			jsonData.Id = v.Id
+		if v.ID == jsonData.ID || v.Link == jsonData.Link {
+			jsonData.ID = v.ID
 			jsonData.Link = v.Link
 			jsonData.ShortLink = v.ShortLink
 		}
@@ -47,11 +50,14 @@ func getData(fileName string) string {
 	return result
 }
 
-func (jsonData JsonData) Set(fileName string) {
-	var toSave []JsonData
-	var savedData []JsonData
+func (jsonData JSONDataSet) Set(fileName string) {
+	var toSave []JSONDataSet
+	var savedData []JSONDataSet
 	jsonString := getData(fileName)
-	_ = json.Unmarshal([]byte(jsonString), &savedData)
+	err := json.Unmarshal([]byte(jsonString), &savedData)
+	if err != nil {
+		fmt.Println(err)
+	}
 	toSave = append(savedData, jsonData)
 	content, _ := json.Marshal(toSave)
 
