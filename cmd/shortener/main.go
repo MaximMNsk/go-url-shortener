@@ -18,18 +18,22 @@ func BadRequest(w http.ResponseWriter) {
 	http.Error(w, "400 bad request", http.StatusBadRequest)
 }
 
-func Created(w http.ResponseWriter, addData string) {
+func SuccessAnswer(w http.ResponseWriter, status int, addData string) {
 	w.Header().Add("Content-Type", "text/plain")
 	dataLength := len(addData)
 	w.Header().Add("Content-Length", strconv.Itoa(dataLength))
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(status)
 	if addData != "" {
 		_, _ = w.Write([]byte(addData))
 	}
 }
 
-func TempRedirect(w http.ResponseWriter, req *http.Request, addData string) {
-	http.Redirect(w, req, addData, http.StatusTemporaryRedirect)
+func Created(w http.ResponseWriter, addData string) {
+	SuccessAnswer(w, http.StatusCreated, addData)
+}
+
+func TempRedirect(w http.ResponseWriter, addData string) {
+	SuccessAnswer(w, http.StatusTemporaryRedirect, addData)
 }
 
 func getShortURL(linkID string) string {
@@ -47,10 +51,12 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		requestID = requestID[1:]
 		linkData.ID = requestID
 		// Проверяем, есть ли он.
+		//fmt.Println(linkData)
 		linkData.Get(LinkFile)
+		//fmt.Println(linkData)
 		if linkData.Link != "" {
 			// Если есть, отдаем 307 редирект
-			TempRedirect(res, req, linkData.Link)
+			TempRedirect(res, linkData.Link)
 		} else {
 			// Если нет, отдаем BadRequest
 			BadRequest(res)

@@ -16,16 +16,20 @@ type JSONDataGet struct {
 type JSONDataSet JSONDataGet
 
 func (jsonData *JSONDataGet) Get(fileName string) {
-	var savedData []JSONDataGet
+	var savedData []JSONDataSet
 	jsonString := getData(fileName)
+	//fmt.Println(jsonString)
 	_ = json.Unmarshal([]byte(jsonString), &savedData)
+	//fmt.Println(savedData)
 	for _, v := range savedData {
+		//fmt.Println(v)
 		if v.ID == jsonData.ID || v.Link == jsonData.Link {
 			jsonData.ID = v.ID
 			jsonData.Link = v.Link
 			jsonData.ShortLink = v.ShortLink
 		}
 	}
+	fmt.Println(jsonData)
 }
 
 func getData(fileName string) string {
