@@ -6,6 +6,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"io"
 	"net/http"
+	"strings"
 )
 
 const LocalHost = "http://localhost"
@@ -39,7 +40,7 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	contentBody, errBody := io.ReadAll(req.Body)
 
 	if currentMethod == "POST" {
-		if currentPath == "/" && contentType == "text/plain" && errBody == nil {
+		if currentPath == "/" && strings.Contains(contentType, "text/plain") && errBody == nil {
 			// Пришел урл
 			linkID := rand.RandStringBytes(8)
 			linkDataGet := files.JSONDataGet{}
@@ -62,7 +63,7 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 			BadRequest(res)
 		}
 	} else if currentMethod == "GET" {
-		if contentType == "text/plain" && errBody == nil {
+		if strings.Contains(contentType, "text/plain") && errBody == nil {
 			// Пришел ид
 			linkData := files.JSONDataGet{}
 			requestID := req.URL.String()
