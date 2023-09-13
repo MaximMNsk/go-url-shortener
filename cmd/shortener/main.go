@@ -6,6 +6,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +20,8 @@ func BadRequest(w http.ResponseWriter) {
 
 func Created(w http.ResponseWriter, addData string) {
 	w.Header().Add("Content-Type", "text/plain")
+	dataLength := len(addData)
+	w.Header().Add("Content-Length", strconv.Itoa(dataLength))
 	w.WriteHeader(http.StatusCreated)
 	if addData != "" {
 		_, _ = w.Write([]byte(addData))
