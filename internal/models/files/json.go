@@ -68,7 +68,7 @@ func (jsonData JSONDataSet) Set(fileName string) {
 }
 
 func saveData(data []byte, fileName string) bool {
-	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return false
 	}
