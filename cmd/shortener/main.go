@@ -18,22 +18,25 @@ func BadRequest(w http.ResponseWriter) {
 	http.Error(w, "400 bad request", http.StatusBadRequest)
 }
 
-func SuccessAnswer(w http.ResponseWriter, status int, addData string) {
+func SuccessAnswer(w http.ResponseWriter, status int, addData string, placeData string) {
 	w.Header().Add("Content-Type", "text/plain")
 	dataLength := len(addData)
 	w.Header().Add("Content-Length", strconv.Itoa(dataLength))
+	if placeData == "header" {
+		w.Header().Add("Location", addData)
+	}
 	w.WriteHeader(status)
-	if addData != "" {
+	if addData != "" && placeData == "body" {
 		_, _ = w.Write([]byte(addData))
 	}
 }
 
 func Created(w http.ResponseWriter, addData string) {
-	SuccessAnswer(w, http.StatusCreated, addData)
+	SuccessAnswer(w, http.StatusCreated, addData, "body")
 }
 
 func TempRedirect(w http.ResponseWriter, addData string) {
-	SuccessAnswer(w, http.StatusTemporaryRedirect, addData)
+	SuccessAnswer(w, http.StatusTemporaryRedirect, addData, "header")
 }
 
 func getShortURL(linkID string) string {
