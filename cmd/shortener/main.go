@@ -6,8 +6,9 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
-	"strings"
 )
 
 const LocalHost = "http://localhost"
@@ -57,11 +58,11 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	if errBody == nil {
 		// Пришел ид
 		linkData := files.JSONDataGet{}
-		requestID := req.URL.String()
+		requestID := req.URL.Path
 		requestID = requestID[1:]
 		linkData.ID = requestID
 		// Проверяем, есть ли он.
-		linkData.Get(LinkFile)
+		linkData.Get(filepath.Join(os.Getenv("HOME"), LinkFile))
 		if linkData.Link != "" {
 			additional := Additional{
 				Place:     "header",
@@ -81,15 +82,15 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 
 func handlePOST(res http.ResponseWriter, req *http.Request) {
 	currentPath := req.URL.Path
-	contentType := req.Header.Get("Content-Type")
+	//contentType := req.Header.Get("Content-Type")
 	contentBody, errBody := io.ReadAll(req.Body)
-	if currentPath == "/" && strings.Contains(contentType, "text/plain") && errBody == nil {
+	if currentPath == "/" /*&& strings.Contains(contentType, "text/plain")*/ && errBody == nil {
 		// Пришел урл
 		linkID := rand.RandStringBytes(8)
 		linkDataGet := files.JSONDataGet{}
 		linkDataGet.Link = string(contentBody)
 		// Проверяем, есть ли он (пока без валидаций).
-		linkDataGet.Get(LinkFile)
+		linkDataGet.Get(filepath.Join(os.Getenv("HOME"), LinkFile))
 		shortLink := linkDataGet.ShortLink
 		// Если нет, генерим ид, сохраняем
 		if linkDataGet.ID == "" {
@@ -97,7 +98,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 			linkDataSet.Link = string(contentBody)
 			linkDataSet.ShortLink = getShortURL(linkID)
 			linkDataSet.ID = linkID
-			linkDataSet.Set(LinkFile)
+			linkDataSet.Set(filepath.Join(os.Getenv("HOME"), LinkFile))
 			shortLink = linkDataSet.ShortLink
 		}
 		// Отдаем 201 ответ с шортлинком
