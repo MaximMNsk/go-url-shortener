@@ -44,27 +44,27 @@ func getShortURL(linkID string) string {
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
-	contentType := req.Header.Get("Content-Type")
-	_, errBody := io.ReadAll(req.Body)
+	//contentType := req.Header.Get("Content-Type")
+	//_, errBody := io.ReadAll(req.Body)
 
-	if strings.Contains(contentType, "text/plain") && errBody == nil {
-		// Пришел ид
-		linkData := files.JSONDataGet{}
-		requestID := req.URL.String()
-		requestID = requestID[1:]
-		linkData.ID = requestID
-		// Проверяем, есть ли он.
-		//fmt.Println(linkData)
-		linkData.Get(LinkFile)
-		//fmt.Println(linkData)
-		if linkData.Link != "" {
-			// Если есть, отдаем 307 редирект
-			TempRedirect(res, linkData.Link)
-		} else {
-			// Если нет, отдаем BadRequest
-			BadRequest(res)
-		}
+	//if strings.Contains(contentType, "text/plain") && errBody == nil {
+	// Пришел ид
+	linkData := files.JSONDataGet{}
+	requestID := req.URL.String()
+	requestID = requestID[1:]
+	linkData.ID = requestID
+	// Проверяем, есть ли он.
+	//fmt.Println(linkData)
+	linkData.Get(LinkFile)
+	//fmt.Println(linkData)
+	if linkData.Link != "" {
+		// Если есть, отдаем 307 редирект
+		TempRedirect(res, linkData.Link)
+	} else {
+		// Если нет, отдаем BadRequest
+		BadRequest(res)
 	}
+	//}
 }
 
 func handlePOST(res http.ResponseWriter, req *http.Request) {
