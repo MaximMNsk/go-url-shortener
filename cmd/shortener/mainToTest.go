@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -10,6 +9,28 @@ import (
 	"strings"
 	"testing"
 )
+
+func Test_getShortURL(t *testing.T) {
+	type args struct {
+		linkID string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "Test link",
+			args: args{linkID: "0X0X0X"},
+			want: "http://localhost:8080/0X0X0X",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, getShortURL(tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
+		})
+	}
+}
 
 func Test_handleMainPage(t *testing.T) {
 	type args struct {
@@ -97,7 +118,6 @@ func Test_handleMainPage(t *testing.T) {
 				linkResult, err := io.ReadAll(result.Body)
 				require.NoError(t, err)
 				shortLink = string(linkResult)
-				fmt.Println(shortLink)
 				require.NotEmpty(t, shortLink)
 				_ = result.Body.Close()
 			}
