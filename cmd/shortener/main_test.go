@@ -81,7 +81,7 @@ func Test_handleMainPage(t *testing.T) {
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
 				assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-				return
+				_ = result.Body.Close()
 			}
 
 			if tt.name == "Set link" {
@@ -100,7 +100,7 @@ func Test_handleMainPage(t *testing.T) {
 				shortLink = string(linkResult)
 				fmt.Println(shortLink)
 				require.NotEmpty(t, shortLink)
-				return
+				_ = result.Body.Close()
 			}
 
 			if tt.name == "Get link" {
@@ -112,7 +112,7 @@ func Test_handleMainPage(t *testing.T) {
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
 				assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
 				assert.Equal(t, result.Header.Get("Location"), tt.want.response)
-				return
+				_ = result.Body.Close()
 			}
 
 		})
