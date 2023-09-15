@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
@@ -68,10 +67,10 @@ func Test_handleMainPage(t *testing.T) {
 	var shortLink string
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := os.Setenv("GO_APP", "D:\\Projects\\go-url-shortener")
-			if err != nil {
-				t.Error(err)
-			}
+			//err := os.Setenv("GO_APP", "D:\\Projects\\go-url-shortener")
+			//if err != nil {
+			//	t.Error(err)
+			//}
 
 			if tt.name == "Bad Request" {
 				request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
