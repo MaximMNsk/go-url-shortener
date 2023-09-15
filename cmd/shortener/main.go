@@ -62,7 +62,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		requestID = requestID[1:]
 		linkData.ID = requestID
 		// Проверяем, есть ли он.
-		linkData.Get(filepath.Join(os.Getenv("HOME"), LinkFile))
+		linkData.Get(filepath.Join(os.Getenv("GO_APP"), LinkFile))
 		if linkData.Link != "" {
 			additional := Additional{
 				Place:     "header",
@@ -90,7 +90,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		linkDataGet := files.JSONDataGet{}
 		linkDataGet.Link = string(contentBody)
 		// Проверяем, есть ли он (пока без валидаций).
-		linkDataGet.Get(filepath.Join(os.Getenv("HOME"), LinkFile))
+		linkDataGet.Get(filepath.Join(os.Getenv("GO_APP"), LinkFile))
 		shortLink := linkDataGet.ShortLink
 		// Если нет, генерим ид, сохраняем
 		if linkDataGet.ID == "" {
@@ -98,7 +98,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 			linkDataSet.Link = string(contentBody)
 			linkDataSet.ShortLink = getShortURL(linkID)
 			linkDataSet.ID = linkID
-			linkDataSet.Set(filepath.Join(os.Getenv("HOME"), LinkFile))
+			linkDataSet.Set(filepath.Join(os.Getenv("GO_APP"), LinkFile))
 			shortLink = linkDataSet.ShortLink
 		}
 		// Отдаем 201 ответ с шортлинком
