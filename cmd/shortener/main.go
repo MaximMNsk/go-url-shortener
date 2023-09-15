@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 )
@@ -53,6 +53,8 @@ func getShortURL(linkID string) string {
 func handleGET(res http.ResponseWriter, req *http.Request) {
 	_ = req.Header.Get("Content-Type")
 	_, errBody := io.ReadAll(req.Body)
+	rootPath, _ := pathhandler.ProjectRoot()
+	linkFilePath := filepath.Join(rootPath, LinkFile)
 
 	//if strings.Contains(contentType, "text/plain") && errBody == nil {
 	if errBody == nil {
@@ -62,7 +64,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		requestID = requestID[1:]
 		linkData.ID = requestID
 		// Проверяем, есть ли он.
-		linkData.Get(filepath.Join(os.Getenv("GO_APP"), LinkFile))
+		linkData.Get(linkFilePath)
 		if linkData.Link != "" {
 			additional := Additional{
 				Place:     "header",
@@ -84,13 +86,16 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	currentPath := req.URL.Path
 	//contentType := req.Header.Get("Content-Type")
 	contentBody, errBody := io.ReadAll(req.Body)
+	rootPath, _ := pathhandler.ProjectRoot()
+	linkFilePath := filepath.Join(rootPath, LinkFile)
+
 	if currentPath == "/" /*&& strings.Contains(contentType, "text/plain")*/ && errBody == nil {
 		// Пришел урл
 		linkID := rand.RandStringBytes(8)
 		linkDataGet := files.JSONDataGet{}
 		linkDataGet.Link = string(contentBody)
 		// Проверяем, есть ли он (пока без валидаций).
-		linkDataGet.Get(filepath.Join(os.Getenv("GO_APP"), LinkFile))
+		linkDataGet.Get(linkFilePath)
 		shortLink := linkDataGet.ShortLink
 		// Если нет, генерим ид, сохраняем
 		if linkDataGet.ID == "" {
@@ -98,7 +103,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 			linkDataSet.Link = string(contentBody)
 			linkDataSet.ShortLink = getShortURL(linkID)
 			linkDataSet.ID = linkID
-			linkDataSet.Set(filepath.Join(os.Getenv("GO_APP"), LinkFile))
+			linkDataSet.Set(linkFilePath)
 			shortLink = linkDataSet.ShortLink
 		}
 		// Отдаем 201 ответ с шортлинком
