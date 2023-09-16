@@ -5,8 +5,10 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
 	"io"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -48,7 +50,16 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 }
 
 func getShortURL(linkID string) string {
-	if flagShortURLAddr != "" {
+	var envCfg Config
+
+	err := env.Parse(&envCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if envCfg.ShortUrlHost != "" {
+		return fmt.Sprintf("%s/%s", envCfg.ShortUrlHost, linkID)
+	} else if flagShortURLAddr != "" {
 		return fmt.Sprintf("%s/%s", flagShortURLAddr, linkID)
 	}
 	return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
@@ -136,21 +147,39 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+type Config struct {
+	AppHost      string `env:"SERVER_ADDRESS"`
+	ShortUrlHost string `env:"BASE_URL"`
+}
+
 func main() {
 
-	parseFlags()
+	var err error
+	var appHost string
 
 	r := chi.NewRouter()
-	//mux := http.NewServeMux()
-	//mux.HandleFunc(`/`, handleMainPage)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handleMainPage)
 		r.Get(`/{test}`, handleMainPage)
 	})
 
-	err := http.ListenAndServe(flagRunAddr, r)
+	var envCfg Config
+
+	err = env.Parse(&envCfg)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+
+	if envCfg.AppHost == "" {
+		parseFlags()
+		appHost = flagRunAddr
+	} else {
+		appHost = envCfg.AppHost
+	}
+
+	err = http.ListenAndServe(appHost, r)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 }
