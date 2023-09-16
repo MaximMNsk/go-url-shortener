@@ -48,6 +48,9 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 }
 
 func getShortURL(linkID string) string {
+	if flagShortURLAddr != "" {
+		return fmt.Sprintf("%s/%s", flagShortURLAddr, linkID)
+	}
 	return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
 }
 
@@ -135,6 +138,8 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 
 func main() {
 
+	parseFlags()
+
 	r := chi.NewRouter()
 	//mux := http.NewServeMux()
 	//mux.HandleFunc(`/`, handleMainPage)
@@ -143,7 +148,7 @@ func main() {
 		r.Get(`/{test}`, handleMainPage)
 	})
 
-	err := http.ListenAndServe(`:8080`, r)
+	err := http.ListenAndServe(flagRunAddr, r)
 	if err != nil {
 		panic(err)
 	}
