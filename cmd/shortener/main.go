@@ -5,6 +5,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -55,13 +56,11 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	_, errBody := io.ReadAll(req.Body)
 	rootPath, _ := pathhandler.ProjectRoot()
 	linkFilePath := filepath.Join(rootPath, LinkFile)
-
-	//if strings.Contains(contentType, "text/plain") && errBody == nil {
+	//if strings.Contains(contentType, "text/plain") {
 	if errBody == nil {
 		// Пришел ид
 		linkData := files.JSONDataGet{}
-		requestID := req.URL.Path
-		requestID = requestID[1:]
+		requestID := req.URL.Path[1:]
 		linkData.ID = requestID
 		// Проверяем, есть ли он.
 		linkData.Get(linkFilePath)
@@ -80,6 +79,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	} else {
 		BadRequest(res)
 	}
+	//}
 }
 
 func handlePOST(res http.ResponseWriter, req *http.Request) {
@@ -117,7 +117,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func handleOther(res http.ResponseWriter, req *http.Request) {
+func handleOther(res http.ResponseWriter) {
 	BadRequest(res)
 }
 
@@ -129,16 +129,21 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	} else if currentMethod == "GET" {
 		handleGET(res, req)
 	} else {
-		handleOther(res, req)
+		handleOther(res)
 	}
 }
 
 func main() {
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, handleMainPage)
+	r := chi.NewRouter()
+	//mux := http.NewServeMux()
+	//mux.HandleFunc(`/`, handleMainPage)
+	r.Route("/", func(r chi.Router) {
+		r.Post(`/`, handleMainPage)
+		r.Get(`/{test}`, handleMainPage)
+	})
 
-	err := http.ListenAndServe(`:8080`, mux)
+	err := http.ListenAndServe(`:8080`, r)
 	if err != nil {
 		panic(err)
 	}
