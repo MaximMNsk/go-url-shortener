@@ -57,8 +57,8 @@ func getShortURL(linkID string) string {
 		log.Fatal(err)
 	}
 
-	if envCfg.ShortUrlHost != "" {
-		return fmt.Sprintf("%s/%s", envCfg.ShortUrlHost, linkID)
+	if envCfg.ShortURLHost != "" {
+		return fmt.Sprintf("%s/%s", envCfg.ShortURLHost, linkID)
 	} else if flagShortURLAddr != "" {
 		return fmt.Sprintf("%s/%s", flagShortURLAddr, linkID)
 	}
@@ -149,7 +149,7 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 
 type Config struct {
 	AppHost      string `env:"SERVER_ADDRESS"`
-	ShortUrlHost string `env:"BASE_URL"`
+	ShortURLHost string `env:"BASE_URL"`
 }
 
 func main() {
