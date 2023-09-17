@@ -171,21 +171,22 @@ func init() {
 	config.Default.AppAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
 	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
 
-	if config.Flag.AppAddr != "" {
-		config.Final.AppAddr = config.Flag.AppAddr
-	} else if config.Env.AppAddr != "" {
+	if config.Env.AppAddr != "" {
 		config.Final.AppAddr = config.Env.AppAddr
+	} else if config.Flag.AppAddr != "" && config.Env.AppAddr == "" {
+		config.Final.AppAddr = config.Flag.AppAddr
 	} else {
 		config.Final.AppAddr = config.Default.AppAddr
 	}
 
 	if config.Env.ShortURLAddr != "" {
 		config.Final.ShortURLAddr = config.Env.ShortURLAddr
-	} else if config.Flag.ShortURLAddr != "" {
+	} else if config.Flag.ShortURLAddr != "" && config.Env.ShortURLAddr == "" {
 		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
 	} else {
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
+	fmt.Printf("%+v\n", config)
 }
 
 func main() {
