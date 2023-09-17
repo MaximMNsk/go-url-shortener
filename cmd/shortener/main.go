@@ -158,7 +158,7 @@ type OuterConfig struct {
 
 var config OuterConfig
 
-func (config OuterConfig) handleFinal() {
+func (config *OuterConfig) handleFinal() {
 	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
 	aHost, aPort, aSplit := net.SplitHostPort(config.Final.AppAddr)
 	if aSplit != nil {
@@ -203,6 +203,8 @@ func init() {
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
 	config.handleFinal()
+	fmt.Printf("%+v\n", config)
+
 }
 
 func main() {
