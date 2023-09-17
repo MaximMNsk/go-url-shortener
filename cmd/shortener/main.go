@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -160,22 +159,17 @@ type OuterConfig struct {
 var config OuterConfig
 
 func (config OuterConfig) handleFinal() {
-	a, errA := url.Parse(config.Final.AppAddr)
-	if errA != nil {
-		panic(errA)
+	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
+	aHost, aPort, aSplit := net.SplitHostPort(config.Final.AppAddr)
+	if aSplit != nil {
+		panic(aSplit)
 	}
-	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, a.Scheme+"://", "", -1)
-	aHost, aPort, _ := net.SplitHostPort(a.Host)
 	if aHost == "" {
 		config.Final.AppAddr = "localhost:" + aPort
 	}
 
-	u, errU := url.Parse(config.Final.ShortURLAddr)
-	if errU != nil {
-		panic(errU)
-	}
-	config.Final.ShortURLAddr = strings.Replace(config.Final.ShortURLAddr, u.Scheme+"://", "", -1)
-	host, port, _ := net.SplitHostPort(u.Host)
+	config.Final.ShortURLAddr = strings.Replace(config.Final.ShortURLAddr, "http://", "", -1)
+	host, port, _ := net.SplitHostPort(config.Final.ShortURLAddr)
 	if host == "" {
 		config.Final.ShortURLAddr = "localhost:" + port
 	}
@@ -211,7 +205,6 @@ func init() {
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
 	config.handleFinal()
-	//fmt.Printf("%+v\n", config)
 }
 
 func main() {
