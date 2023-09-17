@@ -51,7 +51,11 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 }
 
 func getShortURL(linkID string) string {
-	return fmt.Sprintf("%s/%s", config.Final.ShortURLAddr, linkID)
+	if config.Final.ShortURLAddr != "" {
+		return fmt.Sprintf("%s/%s", config.Final.ShortURLAddr, linkID)
+	} else {
+		return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
+	}
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
@@ -172,7 +176,7 @@ func (config *OuterConfig) handleFinal() {
 	}
 }
 
-func init() {
+func handleConfig() {
 
 	err := env.Parse(&config.Env)
 	if err != nil {
@@ -188,7 +192,7 @@ func init() {
 
 	if config.Env.AppAddr != "" {
 		config.Final.AppAddr = config.Env.AppAddr
-	} else if config.Flag.AppAddr != "" && config.Env.AppAddr == "" {
+	} else if config.Flag.AppAddr != "" /*&& config.Env.AppAddr == ""*/ {
 		config.Final.AppAddr = config.Flag.AppAddr
 	} else {
 		config.Final.AppAddr = config.Default.AppAddr
@@ -196,7 +200,7 @@ func init() {
 
 	if config.Env.ShortURLAddr != "" {
 		config.Final.ShortURLAddr = config.Env.ShortURLAddr
-	} else if config.Flag.ShortURLAddr != "" && config.Env.ShortURLAddr == "" {
+	} else if config.Flag.ShortURLAddr != "" /*&& config.Env.ShortURLAddr == ""*/ {
 		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
 	} else {
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
@@ -207,6 +211,8 @@ func init() {
 }
 
 func main() {
+
+	handleConfig()
 
 	var err error
 
