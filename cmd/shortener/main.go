@@ -50,12 +50,8 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 	SuccessAnswer(w, http.StatusTemporaryRedirect, addData)
 }
 
-func getShortURL(linkID string) string {
-	if config.Final.ShortURLAddr != "" {
-		return fmt.Sprintf("%s/%s", config.Final.ShortURLAddr, linkID)
-	} else {
-		return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
-	}
+func getShortURL(hostPort, linkID string) string {
+	return fmt.Sprintf("%s/%s", hostPort, linkID)
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
@@ -108,7 +104,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		if linkDataGet.ID == "" {
 			linkDataSet := files.JSONDataSet{}
 			linkDataSet.Link = string(contentBody)
-			linkDataSet.ShortLink = getShortURL(linkID)
+			linkDataSet.ShortLink = getShortURL(config.Final.ShortURLAddr, linkID)
 			linkDataSet.ID = linkID
 			linkDataSet.Set(linkFilePath)
 			shortLink = linkDataSet.ShortLink
@@ -212,9 +208,9 @@ func handleConfig() {
 
 func main() {
 
-	handleConfig()
-
 	var err error
+
+	handleConfig()
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {

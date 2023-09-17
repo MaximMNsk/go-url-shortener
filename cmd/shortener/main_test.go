@@ -12,7 +12,8 @@ import (
 
 func Test_getShortURL(t *testing.T) {
 	type args struct {
-		linkID string
+		linkID   string
+		hostPort string
 	}
 	tests := []struct {
 		name string
@@ -21,13 +22,13 @@ func Test_getShortURL(t *testing.T) {
 	}{
 		{
 			name: "Test link",
-			args: args{linkID: "0X0X0X"},
+			args: args{linkID: "0X0X0X", hostPort: "http://localhost:8080"},
 			want: "http://localhost:8080/0X0X0X",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, getShortURL(tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
+			assert.Equalf(t, tt.want, getShortURL(tt.args.hostPort, tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
 		})
 	}
 }
@@ -88,7 +89,6 @@ func Test_handleMainPage(t *testing.T) {
 	var shortLink string
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			if tt.name == "Bad Request" {
 				request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 				w := httptest.NewRecorder()
