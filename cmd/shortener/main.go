@@ -8,7 +8,6 @@ import (
 	"github.com/caarlos0/env/v6"
 	"github.com/go-chi/chi/v5"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -177,7 +176,7 @@ func init() {
 
 	err := env.Parse(&config.Env)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	parseFlags()
@@ -219,7 +218,7 @@ func main() {
 
 	err = http.ListenAndServe(config.Final.AppAddr, r)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 }
