@@ -164,7 +164,7 @@ func (config OuterConfig) handleFinal() {
 	if errA != nil {
 		panic(errA)
 	}
-	strings.Replace(config.Final.AppAddr, a.Scheme+"://", "", -1)
+	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, a.Scheme+"://", "", -1)
 	aHost, aPort, _ := net.SplitHostPort(a.Host)
 	if aHost == "" {
 		config.Final.AppAddr = "localhost:" + aPort
@@ -174,7 +174,7 @@ func (config OuterConfig) handleFinal() {
 	if errU != nil {
 		panic(errU)
 	}
-	strings.Replace(config.Final.ShortURLAddr, u.Scheme+"://", "", -1)
+	config.Final.ShortURLAddr = strings.Replace(config.Final.ShortURLAddr, u.Scheme+"://", "", -1)
 	host, port, _ := net.SplitHostPort(u.Host)
 	if host == "" {
 		config.Final.ShortURLAddr = "localhost:" + port
@@ -210,7 +210,8 @@ func init() {
 	} else {
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
-	fmt.Printf("%+v\n", config)
+	config.handleFinal()
+	//fmt.Printf("%+v\n", config)
 }
 
 func main() {
