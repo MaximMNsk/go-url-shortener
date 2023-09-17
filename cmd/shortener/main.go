@@ -168,10 +168,8 @@ func (config OuterConfig) handleFinal() {
 		config.Final.AppAddr = "localhost:" + aPort
 	}
 
-	config.Final.ShortURLAddr = strings.Replace(config.Final.ShortURLAddr, "http://", "", -1)
-	host, port, _ := net.SplitHostPort(config.Final.ShortURLAddr)
-	if host == "" {
-		config.Final.ShortURLAddr = "localhost:" + port
+	if config.Final.ShortURLAddr[0:7] != "http://" {
+		config.Final.ShortURLAddr = "http://" + config.Final.ShortURLAddr
 	}
 }
 
