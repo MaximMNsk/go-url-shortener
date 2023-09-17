@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const LocalHost = "http://localhost"
@@ -50,19 +51,7 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 }
 
 func getShortURL(linkID string) string {
-	var envCfg Config
-
-	err := env.Parse(&envCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if envCfg.ShortURLHost != "" {
-		return fmt.Sprintf("%s/%s", envCfg.ShortURLHost, linkID)
-	} else if flagShortURLAddr != "" {
-		return fmt.Sprintf("%s/%s", flagShortURLAddr, linkID)
-	}
-	return fmt.Sprintf("%s:%s/%s", LocalHost, LocalPort, linkID)
+	return fmt.Sprintf("%s/%s", config.Final.ShortURLAddr, linkID)
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
@@ -147,15 +136,62 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-type Config struct {
-	AppHost      string `env:"SERVER_ADDRESS"`
-	ShortURLHost string `env:"BASE_URL"`
+type OuterConfig struct {
+	Default struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+	Env struct {
+		AppAddr      string `env:"SERVER_ADDRESS"`
+		ShortURLAddr string `env:"BASE_URL"`
+	}
+	Flag struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+	Final struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+}
+
+var config OuterConfig
+
+func init() {
+	var err error
+
+	err = env.Parse(&config.Env)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	parseFlags()
+	config.Flag.AppAddr = AppAddr
+	config.Flag.ShortURLAddr = ShortURLAddr
+
+	config.Default.AppAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
+	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
+
+	if config.Env.AppAddr != "" {
+		config.Final.AppAddr = config.Env.AppAddr
+	} else if config.Flag.AppAddr != "" {
+		config.Final.AppAddr = config.Flag.AppAddr
+	} else {
+		config.Final.AppAddr = config.Default.AppAddr
+	}
+
+	if config.Env.ShortURLAddr != "" {
+		config.Final.ShortURLAddr = config.Env.ShortURLAddr
+	} else if config.Flag.ShortURLAddr != "" {
+		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
+	} else {
+		config.Final.ShortURLAddr = config.Default.ShortURLAddr
+	}
 }
 
 func main() {
 
 	var err error
-	var appHost string
 
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
@@ -163,21 +199,7 @@ func main() {
 		r.Get(`/{test}`, handleMainPage)
 	})
 
-	var envCfg Config
-
-	err = env.Parse(&envCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if envCfg.AppHost == "" {
-		parseFlags()
-		appHost = flagRunAddr
-	} else {
-		appHost = envCfg.AppHost
-	}
-
-	err = http.ListenAndServe(appHost, r)
+	err = http.ListenAndServe(strings.Replace(config.Final.AppAddr, "http://", "", -1), r)
 	if err != nil {
 		log.Fatal(err)
 	}
