@@ -158,9 +158,8 @@ type OuterConfig struct {
 var config OuterConfig
 
 func init() {
-	var err error
 
-	err = env.Parse(&config.Env)
+	err := env.Parse(&config.Env)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -172,10 +171,10 @@ func init() {
 	config.Default.AppAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
 	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
 
-	if config.Env.AppAddr != "" {
-		config.Final.AppAddr = config.Env.AppAddr
-	} else if config.Flag.AppAddr != "" {
+	if config.Flag.AppAddr != "" {
 		config.Final.AppAddr = config.Flag.AppAddr
+	} else if config.Env.AppAddr != "" {
+		config.Final.AppAddr = config.Env.AppAddr
 	} else {
 		config.Final.AppAddr = config.Default.AppAddr
 	}
