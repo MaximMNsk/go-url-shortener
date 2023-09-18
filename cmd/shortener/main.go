@@ -19,14 +19,92 @@ const LocalHost = "http://localhost"
 const LocalPort = "8080"
 const LinkFile = "internal/storage/links.json"
 
-func BadRequest(w http.ResponseWriter) {
-	http.Error(w, "400 bad request", http.StatusBadRequest)
-}
-
 type Additional struct {
 	Place     string
 	OuterData string
 	InnerData string
+}
+
+type OuterConfig struct {
+	Default struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+	Env struct {
+		AppAddr      string `env:"SERVER_ADDRESS"`
+		ShortURLAddr string `env:"BASE_URL"`
+	}
+	Flag struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+	Final struct {
+		AppAddr      string
+		ShortURLAddr string
+	}
+}
+
+var config OuterConfig
+
+/**
+ * Config handlers
+ */
+
+func (config *OuterConfig) handleFinal() {
+	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
+	aHost, aPort, aSplit := net.SplitHostPort(config.Final.AppAddr)
+	if aSplit != nil {
+		panic(aSplit)
+	}
+	if aHost == "" {
+		config.Final.AppAddr = "localhost:" + aPort
+	}
+
+	if config.Final.ShortURLAddr[0:7] != "http://" {
+		config.Final.ShortURLAddr = "http://" + config.Final.ShortURLAddr
+	}
+}
+
+func handleConfig() {
+
+	err := env.Parse(&config.Env)
+	if err != nil {
+		panic(err)
+	}
+
+	parseFlags()
+	config.Flag.AppAddr = AppAddr
+	config.Flag.ShortURLAddr = ShortURLAddr
+
+	config.Default.AppAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
+	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
+
+	if config.Env.AppAddr != "" {
+		config.Final.AppAddr = config.Env.AppAddr
+	} else if config.Flag.AppAddr != "" /*&& config.Env.AppAddr == ""*/ {
+		config.Final.AppAddr = config.Flag.AppAddr
+	} else {
+		config.Final.AppAddr = config.Default.AppAddr
+	}
+
+	if config.Env.ShortURLAddr != "" {
+		config.Final.ShortURLAddr = config.Env.ShortURLAddr
+	} else if config.Flag.ShortURLAddr != "" /*&& config.Env.ShortURLAddr == ""*/ {
+		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
+	} else {
+		config.Final.ShortURLAddr = config.Default.ShortURLAddr
+	}
+	config.handleFinal()
+	//fmt.Printf("%+v\n", config)
+
+}
+
+/**
+ * Responses
+ */
+
+func BadRequest(w http.ResponseWriter) {
+	http.Error(w, "400 bad request", http.StatusBadRequest)
 }
 
 func SuccessAnswer(w http.ResponseWriter, status int, additionalData Additional) {
@@ -53,6 +131,10 @@ func TempRedirect(w http.ResponseWriter, addData Additional) {
 func getShortURL(hostPort, linkID string) string {
 	return fmt.Sprintf("%s/%s", hostPort, linkID)
 }
+
+/**
+ * Request type handlers
+ */
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
 	_ = req.Header.Get("Content-Type")
@@ -124,6 +206,10 @@ func handleOther(res http.ResponseWriter) {
 	BadRequest(res)
 }
 
+/**
+ * Route handlers
+ */
+
 func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	currentMethod := req.Method
 
@@ -136,75 +222,9 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-type OuterConfig struct {
-	Default struct {
-		AppAddr      string
-		ShortURLAddr string
-	}
-	Env struct {
-		AppAddr      string `env:"SERVER_ADDRESS"`
-		ShortURLAddr string `env:"BASE_URL"`
-	}
-	Flag struct {
-		AppAddr      string
-		ShortURLAddr string
-	}
-	Final struct {
-		AppAddr      string
-		ShortURLAddr string
-	}
-}
-
-var config OuterConfig
-
-func (config *OuterConfig) handleFinal() {
-	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
-	aHost, aPort, aSplit := net.SplitHostPort(config.Final.AppAddr)
-	if aSplit != nil {
-		panic(aSplit)
-	}
-	if aHost == "" {
-		config.Final.AppAddr = "localhost:" + aPort
-	}
-
-	if config.Final.ShortURLAddr[0:7] != "http://" {
-		config.Final.ShortURLAddr = "http://" + config.Final.ShortURLAddr
-	}
-}
-
-func handleConfig() {
-
-	err := env.Parse(&config.Env)
-	if err != nil {
-		panic(err)
-	}
-
-	parseFlags()
-	config.Flag.AppAddr = AppAddr
-	config.Flag.ShortURLAddr = ShortURLAddr
-
-	config.Default.AppAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
-	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", LocalHost, LocalPort)
-
-	if config.Env.AppAddr != "" {
-		config.Final.AppAddr = config.Env.AppAddr
-	} else if config.Flag.AppAddr != "" /*&& config.Env.AppAddr == ""*/ {
-		config.Final.AppAddr = config.Flag.AppAddr
-	} else {
-		config.Final.AppAddr = config.Default.AppAddr
-	}
-
-	if config.Env.ShortURLAddr != "" {
-		config.Final.ShortURLAddr = config.Env.ShortURLAddr
-	} else if config.Flag.ShortURLAddr != "" /*&& config.Env.ShortURLAddr == ""*/ {
-		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
-	} else {
-		config.Final.ShortURLAddr = config.Default.ShortURLAddr
-	}
-	config.handleFinal()
-	fmt.Printf("%+v\n", config)
-
-}
+/**
+ * Executor
+ */
 
 func main() {
 
