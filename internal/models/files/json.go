@@ -2,7 +2,7 @@ package files
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 )
@@ -15,56 +15,62 @@ type JSONDataGet struct {
 
 type JSONDataSet JSONDataGet
 
-func (jsonData *JSONDataGet) Get(fileName string) {
+func (jsonData *JSONDataGet) Get(fileName string) error {
 	var savedData []JSONDataSet
-	jsonString := getData(fileName)
-	_ = json.Unmarshal([]byte(jsonString), &savedData)
-	for _, v := range savedData {
-		if v.ID == jsonData.ID || v.Link == jsonData.Link {
-			jsonData.ID = v.ID
-			jsonData.Link = v.Link
-			jsonData.ShortLink = v.ShortLink
+	jsonString, err := getData(fileName)
+	if err == nil {
+		err = json.Unmarshal([]byte(jsonString), &savedData)
+		if err == nil {
+			for _, v := range savedData {
+				if v.ID == jsonData.ID || v.Link == jsonData.Link {
+					jsonData.ID = v.ID
+					jsonData.Link = v.Link
+					jsonData.ShortLink = v.ShortLink
+				}
+			}
 		}
 	}
+	return err
 }
 
-func getData(fileName string) string {
+func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
-	f, _ := os.OpenFile(fileName, os.O_RDONLY, 0644)
+	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
-			panic(err)
-		}
+		err = f.Close()
 	}(f)
-
-	for {
-		n, err := f.Read(data)
-		if err == io.EOF { // если конец файла
-			break // выходим из цикла
+	if err == nil {
+		for {
+			n, errRead := f.Read(data)
+			if errRead == io.EOF { // если конец файла
+				break // выходим из цикла
+			}
+			result += string(data[:n])
 		}
-		result += string(data[:n])
 	}
-
-	return result
+	return result, err
 }
 
-func (jsonData JSONDataSet) Set(fileName string) {
+func (jsonData JSONDataSet) Set(fileName string) error {
 	var toSave []JSONDataSet
 	var savedData []JSONDataSet
-	jsonString := getData(fileName)
-	err := json.Unmarshal([]byte(jsonString), &savedData)
-	if err != nil {
-		fmt.Println(err)
+	jsonString, err := getData(fileName)
+	if err == nil {
+		err = json.Unmarshal([]byte(jsonString), &savedData)
+		if err == nil {
+			toSave = append(savedData, jsonData)
+			var content []byte
+			content, err = json.Marshal(toSave)
+			if err == nil {
+				isOk := saveData(content, fileName)
+				if !isOk {
+					err = errors.New("cant save")
+				}
+			}
+		}
 	}
-	toSave = append(savedData, jsonData)
-	content, _ := json.Marshal(toSave)
-
-	isOk := saveData(content, fileName)
-	if !isOk {
-		panic("Saving error")
-	}
+	return err
 }
 
 func saveData(data []byte, fileName string) bool {
@@ -73,10 +79,7 @@ func saveData(data []byte, fileName string) bool {
 		return false
 	}
 	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
-			panic(err)
-		}
+		err = f.Close()
 	}(f)
 
 	_, err = f.Write(data)

@@ -65,7 +65,7 @@ func Test_handleMainPage(t *testing.T) {
 			name: "Set link",
 			args: args{
 				method:   http.MethodPost,
-				path:     "/",
+				path:     "http://localhost:8080/",
 				testLink: "https://ya.ru",
 			},
 			want: want{
@@ -77,7 +77,7 @@ func Test_handleMainPage(t *testing.T) {
 			name: "Get link",
 			args: args{
 				method: http.MethodGet,
-				path:   "/",
+				path:   "http://localhost:8080/",
 			},
 			want: want{
 				contentType: "text/plain",

@@ -9,13 +9,15 @@ func ProjectRoot() (string, error) {
 	currentPath := ""
 	var err error
 	for i := 0; i < 9; i++ {
-		currentPath, _ = os.Getwd()
-		modFile := filepath.Join(currentPath, "go.mod")
-		if _, err = os.Stat(modFile); err == nil {
-			break
-		} else {
-			err = os.Chdir("../")
-			continue
+		currentPath, err = os.Getwd()
+		if err == nil {
+			modFile := filepath.Join(currentPath, "go.mod")
+			if _, err = os.Stat(modFile); err == nil {
+				break
+			} else {
+				err = os.Chdir("../")
+				continue
+			}
 		}
 	}
 
