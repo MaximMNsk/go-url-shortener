@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
@@ -130,20 +131,24 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 
 func main() {
 
+	logger.PrintLog("INFO", "Start server")
+
+	logger.PrintLog("INFO", "Handle config")
 	err := confModule.HandleConfig()
 	if err != nil {
-		panic(err)
+		logger.PrintLog("FATAL", "Can't handle config. "+err.Error())
 	}
 
+	logger.PrintLog("INFO", "Declaring router")
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handleMainPage)
 		r.Get(`/{test}`, handleMainPage)
 	})
 
+	logger.PrintLog("INFO", "Starting server")
 	err = http.ListenAndServe(confModule.Config.Final.AppAddr, r)
 	if err != nil {
-		panic(err)
+		logger.PrintLog("FATAL", "Can't start server. "+err.Error())
 	}
-
 }
