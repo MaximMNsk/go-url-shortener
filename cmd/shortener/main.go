@@ -131,24 +131,24 @@ func handleMainPage(res http.ResponseWriter, req *http.Request) {
 
 func main() {
 
-	logger.PrintLog("INFO", "Start server")
+	logger.PrintLog(logger.INFO, "Start server")
 
-	logger.PrintLog("INFO", "Handle config")
+	logger.PrintLog(logger.INFO, "Handle config")
 	err := confModule.HandleConfig()
 	if err != nil {
-		logger.PrintLog("FATAL", "Can't handle config. "+err.Error())
+		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
-	logger.PrintLog("INFO", "Declaring router")
+	logger.PrintLog(logger.INFO, "Declaring router")
 	r := chi.NewRouter()
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handleMainPage)
 		r.Get(`/{test}`, handleMainPage)
 	})
 
-	logger.PrintLog("INFO", "Starting server")
+	logger.PrintLog(logger.INFO, "Starting server")
 	err = http.ListenAndServe(confModule.Config.Final.AppAddr, r)
 	if err != nil {
-		logger.PrintLog("FATAL", "Can't start server. "+err.Error())
+		logger.PrintLog(logger.FATAL, "Can't start server. "+err.Error())
 	}
 }
