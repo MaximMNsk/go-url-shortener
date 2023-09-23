@@ -92,7 +92,7 @@ func Test_handleMainPage(t *testing.T) {
 			if tt.name == "Bad Request" {
 				request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
 				w := httptest.NewRecorder()
-				handleMainPage(w, request)
+				ServeHTTP(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
@@ -104,7 +104,7 @@ func Test_handleMainPage(t *testing.T) {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)
 				w := httptest.NewRecorder()
-				handleMainPage(w, request)
+				ServeHTTP(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
@@ -121,7 +121,7 @@ func Test_handleMainPage(t *testing.T) {
 			if tt.name == "Get link" {
 				request := httptest.NewRequest(tt.args.method, shortLink, nil)
 				w := httptest.NewRecorder()
-				handleMainPage(w, request)
+				ServeHTTP(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)

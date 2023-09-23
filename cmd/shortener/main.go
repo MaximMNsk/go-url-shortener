@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
@@ -100,8 +101,10 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 			InnerData: shortLink,
 		}
 		httpResp.Created(res, additional)
+		return
 	} else {
 		httpResp.BadRequest(res)
+		return
 	}
 }
 
@@ -113,7 +116,7 @@ func handleOther(res http.ResponseWriter) {
  * Route handlers
  */
 
-func handleMainPage(res http.ResponseWriter, req *http.Request) {
+func ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	currentMethod := req.Method
 
 	if currentMethod == "POST" {
@@ -140,10 +143,10 @@ func main() {
 	}
 
 	logger.PrintLog(logger.INFO, "Declaring router")
-	r := chi.NewRouter()
+	r := chi.NewRouter().With(extlogger.Log)
 	r.Route("/", func(r chi.Router) {
-		r.Post(`/`, handleMainPage)
-		r.Get(`/{test}`, handleMainPage)
+		r.Post(`/`, ServeHTTP)
+		r.Get(`/{test}`, ServeHTTP)
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")
