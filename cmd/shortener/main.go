@@ -130,7 +130,7 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
-	if currentPath == "/shorten" {
+	if currentPath == "/api/shorten" {
 		// Пришел урл
 		linkID := rand.RandStringBytes(8)
 		linkDataGet := files.JSONDataGet{}
@@ -192,7 +192,8 @@ func handleOther(res http.ResponseWriter) {
 func ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	currentMethod := req.Method
 	uri := strings.Split(req.URL.Path, "/")
-	controller := uri[1]
+	controller := uri[2]
+	fmt.Println(controller)
 
 	if currentMethod == "POST" {
 		if controller == "shorten" {
