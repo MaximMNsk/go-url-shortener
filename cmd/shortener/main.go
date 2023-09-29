@@ -136,6 +136,10 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		linkDataGet := files.JSONDataGet{}
 		var linkData input
 		err = json.Unmarshal(contentBody, &linkData)
+		if err != nil {
+			httpResp.InternalError(res)
+			return
+		}
 		linkDataGet.Link = linkData.URL
 		err := linkDataGet.Get(linkFilePath)
 		if err != nil {
@@ -224,7 +228,7 @@ func main() {
 	r := chi.NewRouter().With(extlogger.Log)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, ServeHTTP)
-		r.Post(`/shorten`, ServeHTTP)
+		r.Post(`/api/shorten`, ServeHTTP)
 		r.Get(`/{test}`, ServeHTTP)
 	})
 
