@@ -191,11 +191,13 @@ func handleOther(res http.ResponseWriter) {
 
 func ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	currentMethod := req.Method
-	uri := strings.Split(req.URL.Path, "/")
-	controller := uri[2]
-	fmt.Println(controller)
 
 	if currentMethod == "POST" {
+		uri := strings.Split(req.URL.Path, "/")
+		var controller string
+		if len(uri) == 3 {
+			controller = uri[2]
+		}
 		if controller == "shorten" {
 			handlePOSTOverJSON(res, req)
 			return
