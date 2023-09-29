@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 /**
@@ -108,6 +110,73 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+type input struct {
+	URL string `json:"url"`
+}
+type output struct {
+	Result string `json:"result"`
+}
+
+func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
+	currentPath := req.URL.Path
+	contentBody, errBody := io.ReadAll(req.Body)
+	if errBody != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+	rootPath, err := pathhandler.ProjectRoot()
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
+	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
+	if currentPath == "/shorten" {
+		// Пришел урл
+		linkID := rand.RandStringBytes(8)
+		linkDataGet := files.JSONDataGet{}
+		var linkData input
+		err = json.Unmarshal(contentBody, &linkData)
+		linkDataGet.Link = linkData.URL
+		err := linkDataGet.Get(linkFilePath)
+		if err != nil {
+			httpResp.InternalError(res)
+			return
+		}
+		shortLink := linkDataGet.ShortLink
+		// Если нет, генерим ид, сохраняем
+		if linkDataGet.ID == "" {
+			linkDataSet := files.JSONDataSet{}
+			linkDataSet.Link = string(contentBody)
+			linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+			linkDataSet.ID = linkID
+			err := linkDataSet.Set(linkFilePath)
+			if err != nil {
+				httpResp.InternalError(res)
+				return
+			}
+			shortLink = linkDataSet.ShortLink
+		}
+		var resp output
+		resp.Result = shortLink
+		var JSONResp []byte
+		JSONResp, err = json.Marshal(resp)
+		if err != nil {
+			httpResp.InternalError(res)
+			return
+		}
+		// Отдаем 201 ответ с шортлинком
+		additional := confModule.Additional{
+			Place:     "body",
+			InnerData: string(JSONResp),
+		}
+		httpResp.CreatedJSON(res, additional)
+		return
+	} else {
+		httpResp.BadRequest(res)
+		return
+	}
+}
+
 func handleOther(res http.ResponseWriter) {
 	httpResp.BadRequest(res)
 }
@@ -118,13 +187,22 @@ func handleOther(res http.ResponseWriter) {
 
 func ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	currentMethod := req.Method
+	uri := strings.Split(req.URL.Path, "/")
+	controller := uri[1]
 
 	if currentMethod == "POST" {
+		if controller == "shorten" {
+			handlePOSTOverJSON(res, req)
+			return
+		}
 		handlePOST(res, req)
+		return
 	} else if currentMethod == "GET" {
 		handleGET(res, req)
+		return
 	} else {
 		handleOther(res)
+		return
 	}
 }
 
@@ -146,6 +224,7 @@ func main() {
 	r := chi.NewRouter().With(extlogger.Log)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, ServeHTTP)
+		r.Post(`/shorten`, ServeHTTP)
 		r.Get(`/{test}`, ServeHTTP)
 	})
 
