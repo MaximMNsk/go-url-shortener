@@ -172,7 +172,6 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		InnerData: string(JSONResp),
 	}
 	httpResp.CreatedJSON(res, additional)
-	return
 }
 
 func handleOther(res http.ResponseWriter) {
