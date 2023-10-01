@@ -118,7 +118,6 @@ type output struct {
 }
 
 func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
-	currentPath := req.URL.Path
 	contentBody, errBody := io.ReadAll(req.Body)
 	if errBody != nil {
 		httpResp.BadRequest(res)
@@ -130,55 +129,50 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
-	if currentPath == "/api/shorten" {
-		// Пришел урл
-		linkID := rand.RandStringBytes(8)
-		linkDataGet := files.JSONDataGet{}
-		var linkData input
-		err = json.Unmarshal(contentBody, &linkData)
-		if err != nil {
-			httpResp.InternalError(res)
-			return
-		}
-		linkDataGet.Link = linkData.URL
-		err := linkDataGet.Get(linkFilePath)
-		if err != nil {
-			httpResp.InternalError(res)
-			return
-		}
-		shortLink := linkDataGet.ShortLink
-		// Если нет, генерим ид, сохраняем
-		if linkDataGet.ID == "" {
-			linkDataSet := files.JSONDataSet{}
-			linkDataSet.Link = string(contentBody)
-			linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-			linkDataSet.ID = linkID
-			err := linkDataSet.Set(linkFilePath)
-			if err != nil {
-				httpResp.InternalError(res)
-				return
-			}
-			shortLink = linkDataSet.ShortLink
-		}
-		var resp output
-		resp.Result = shortLink
-		var JSONResp []byte
-		JSONResp, err = json.Marshal(resp)
-		if err != nil {
-			httpResp.InternalError(res)
-			return
-		}
-		// Отдаем 201 ответ с шортлинком
-		additional := confModule.Additional{
-			Place:     "body",
-			InnerData: string(JSONResp),
-		}
-		httpResp.CreatedJSON(res, additional)
-		return
-	} else {
-		httpResp.BadRequest(res)
+	// Пришел урл
+	linkID := rand.RandStringBytes(8)
+	linkDataGet := files.JSONDataGet{}
+	var linkData input
+	err = json.Unmarshal(contentBody, &linkData)
+	if err != nil {
+		httpResp.InternalError(res)
 		return
 	}
+	linkDataGet.Link = linkData.URL
+	err = linkDataGet.Get(linkFilePath)
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
+	shortLink := linkDataGet.ShortLink
+	// Если нет, генерим ид, сохраняем
+	if linkDataGet.ID == "" {
+		linkDataSet := files.JSONDataSet{}
+		linkDataSet.Link = linkData.URL
+		linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkDataSet.ID = linkID
+		err := linkDataSet.Set(linkFilePath)
+		if err != nil {
+			httpResp.InternalError(res)
+			return
+		}
+		shortLink = linkDataSet.ShortLink
+	}
+	var resp output
+	resp.Result = shortLink
+	var JSONResp []byte
+	JSONResp, err = json.Marshal(resp)
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
+	// Отдаем 201 ответ с шортлинком
+	additional := confModule.Additional{
+		Place:     "body",
+		InnerData: string(JSONResp),
+	}
+	httpResp.CreatedJSON(res, additional)
+	return
 }
 
 func handleOther(res http.ResponseWriter) {
@@ -194,10 +188,11 @@ func ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 	if currentMethod == "POST" {
 		uri := strings.Split(req.URL.Path, "/")
-		var controller string
-		if len(uri) == 3 {
+		var controller = "empty"
+		if len(uri) >= 3 {
 			controller = uri[2]
 		}
+		logger.PrintLog(logger.INFO, "Controller: "+controller)
 		if controller == "shorten" {
 			handlePOSTOverJSON(res, req)
 			return
