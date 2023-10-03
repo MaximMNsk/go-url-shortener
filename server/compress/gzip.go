@@ -16,11 +16,10 @@ type GzipWriter struct {
 //	return w.Writer.Write(b)
 //}
 
-var needDecompress = false
+var needCompress = false
 
 func HandleValue(b []byte) ([]byte, error) {
-	fmt.Println(needDecompress)
-	if needDecompress {
+	if needCompress {
 		return Compress(b)
 	} else {
 		return b, nil
@@ -36,7 +35,7 @@ func GzipHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		needDecompress = true
+		needCompress = true
 
 		w.Header().Set("Content-Encoding", "gzip")
 
@@ -73,7 +72,16 @@ func Compress(data []byte) ([]byte, error) {
 func Decompress(data []byte) ([]byte, error) {
 	// переменная r будет читать входящие данные и распаковывать их
 	r, err := gzip.NewReader(bytes.NewReader(data))
-	defer r.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed create reader: %v", err)
+	}
+
+	defer func(r *gzip.Reader) {
+		err := r.Close()
+		if err != nil {
+			return
+		}
+	}(r)
 
 	var b bytes.Buffer
 	// в переменную b записываются распакованные данные

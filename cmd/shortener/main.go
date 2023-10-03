@@ -110,7 +110,6 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		InnerData: shortLink,
 	}
 	httpResp.Created(res, additional)
-	return
 }
 
 type input struct {
@@ -188,7 +187,6 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		InnerData: string(JSONResp),
 	}
 	httpResp.CreatedJSON(res, additional)
-	return
 }
 
 func handleOther(next http.Handler) http.Handler {
