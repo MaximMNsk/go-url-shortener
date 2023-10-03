@@ -36,7 +36,7 @@ func GzipHandler(next http.Handler) http.Handler {
 		//	return
 		//}
 		if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") &&
-			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/plain"))) {
+			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/html"))) {
 			needCompress = false
 			next.ServeHTTP(w, r)
 			return
