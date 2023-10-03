@@ -47,12 +47,11 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	link, _ := compress.HandleValue([]byte(linkData.Link))
 	if linkData.Link != "" {
 		additional := confModule.Additional{
 			Place:     "header",
 			OuterData: "Location",
-			InnerData: string(link),
+			InnerData: linkData.Link,
 		}
 		// Если есть, отдаем 307 редирект
 		httpResp.TempRedirect(res, additional)
