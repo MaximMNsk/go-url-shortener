@@ -15,7 +15,6 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
-	"strings"
 )
 
 /**
@@ -27,7 +26,11 @@ func getShortURL(hostPort, linkID string) string {
 }
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
-	_ = req.Header.Get("Content-Type")
+	//contentType := req.Header.Get("Content-Type")
+	//if contentType != "text/plain" {
+	//	httpResp.BadRequest(res)
+	//	return
+	//}
 	rootPath, err := pathhandler.ProjectRoot()
 	if err != nil {
 		httpResp.InternalError(res)
@@ -60,8 +63,12 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 }
 
 func handlePOST(res http.ResponseWriter, req *http.Request) {
-	currentPath := req.URL.Path
 	//contentType := req.Header.Get("Content-Type")
+	//if contentType != "text/plain" {
+	//	httpResp.BadRequest(res)
+	//	return
+	//}
+
 	contentBody, errBody := io.ReadAll(req.Body)
 	if errBody != nil {
 		httpResp.BadRequest(res)
@@ -73,42 +80,37 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
-	if currentPath == "/" /*&& strings.Contains(contentType, "text/plain")*/ {
-		// Пришел урл
-		linkID := rand.RandStringBytes(8)
-		linkDataGet := files.JSONDataGet{}
-		linkDataGet.Link = string(contentBody)
-		// Проверяем, есть ли он (пока без валидаций).
-		err := linkDataGet.Get(linkFilePath)
+	// Пришел урл
+	linkID := rand.RandStringBytes(8)
+	linkDataGet := files.JSONDataGet{}
+	linkDataGet.Link = string(contentBody)
+	// Проверяем, есть ли он (пока без валидаций).
+	err = linkDataGet.Get(linkFilePath)
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
+	shortLink := linkDataGet.ShortLink
+	// Если нет, генерим ид, сохраняем
+	if linkDataGet.ID == "" {
+		linkDataSet := files.JSONDataSet{}
+		linkDataSet.Link = string(contentBody)
+		linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkDataSet.ID = linkID
+		err := linkDataSet.Set(linkFilePath)
 		if err != nil {
 			httpResp.InternalError(res)
 			return
 		}
-		shortLink := linkDataGet.ShortLink
-		// Если нет, генерим ид, сохраняем
-		if linkDataGet.ID == "" {
-			linkDataSet := files.JSONDataSet{}
-			linkDataSet.Link = string(contentBody)
-			linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-			linkDataSet.ID = linkID
-			err := linkDataSet.Set(linkFilePath)
-			if err != nil {
-				httpResp.InternalError(res)
-				return
-			}
-			shortLink = linkDataSet.ShortLink
-		}
-		// Отдаем 201 ответ с шортлинком
-		additional := confModule.Additional{
-			Place:     "body",
-			InnerData: shortLink,
-		}
-		httpResp.Created(res, additional)
-		return
-	} else {
-		httpResp.BadRequest(res)
-		return
+		shortLink = linkDataSet.ShortLink
 	}
+	// Отдаем 201 ответ с шортлинком
+	additional := confModule.Additional{
+		Place:     "body",
+		InnerData: shortLink,
+	}
+	httpResp.Created(res, additional)
+	return
 }
 
 type input struct {
@@ -119,20 +121,24 @@ type output struct {
 }
 
 func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
+	//contentType := req.Header.Get("Content-Type")
+	//if contentType != "application/json" {
+	//	httpResp.BadRequest(res)
+	//	return
+	//}
+
 	contentBody, errBody := io.ReadAll(req.Body)
-	fmt.Println(contentBody)
-	contentBody, errBody = compress.Decompress(contentBody)
-	fmt.Println(errBody)
-	fmt.Println(contentBody)
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
 	}
+
 	rootPath, err := pathhandler.ProjectRoot()
 	if err != nil {
 		httpResp.InternalError(res)
 		return
 	}
+
 	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
@@ -171,49 +177,28 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
+	JSONResp, err = compress.HandleValue(JSONResp)
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
 	// Отдаем 201 ответ с шортлинком
 	additional := confModule.Additional{
 		Place:     "body",
 		InnerData: string(JSONResp),
 	}
 	httpResp.CreatedJSON(res, additional)
+	return
 }
 
-func handlePOSTOverJSONGzip(res http.ResponseWriter, req *http.Request) {
-	fmt.Println(req.Body, res.Header())
-}
-
-func handleOther(res http.ResponseWriter) {
-	httpResp.BadRequest(res)
-}
-
-/**
- * Route handlers
- */
-
-func ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	currentMethod := req.Method
-
-	if currentMethod == "POST" {
-		uri := strings.Split(req.URL.Path, "/")
-		var controller = "empty"
-		if len(uri) >= 3 {
-			controller = uri[2]
+func handleOther(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		if req.Method == "GET" || req.Method == "POST" {
+			next.ServeHTTP(res, req)
+		} else {
+			httpResp.BadRequest(res)
 		}
-		logger.PrintLog(logger.INFO, "Controller: "+controller)
-		if controller == "shorten" {
-			handlePOSTOverJSON(res, req)
-			return
-		}
-		handlePOST(res, req)
-		return
-	} else if currentMethod == "GET" {
-		handleGET(res, req)
-		return
-	} else {
-		handleOther(res)
-		return
-	}
+	})
 }
 
 /**
@@ -231,11 +216,11 @@ func main() {
 	}
 
 	logger.PrintLog(logger.INFO, "Declaring router")
-	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler)
+	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)
 	r.Route("/", func(r chi.Router) {
-		r.Post(`/`, ServeHTTP)
-		r.Post(`/api/shorten`, ServeHTTP)
-		r.Get(`/{test}`, ServeHTTP)
+		r.Post(`/`, handlePOST)
+		r.Post(`/api/shorten`, handlePOSTOverJSON)
+		r.Get(`/{test}`, handleGET)
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")

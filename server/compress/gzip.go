@@ -4,79 +4,43 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
-type gzipWriter struct {
+type GzipWriter struct {
 	http.ResponseWriter
-	Writer io.Writer
 }
 
-func (w gzipWriter) Write(b []byte) (int, error) {
-	return w.Writer.Write(b)
-}
+//func (w GzipWriter) Write(b []byte) (int, error) {
+//	return w.Writer.Write(b)
+//}
 
-func LengthHandle(w http.ResponseWriter, r *http.Request) (string, error) {
-	// переменная reader будет равна r.Body или *gzip.Reader
-	var reader io.Reader
+var needDecompress = false
 
-	if r.Header.Get(`Content-Encoding`) == `gzip` {
-		gz, err := gzip.NewReader(r.Body)
-		if err != nil {
-			return "", err
-		}
-		reader = gz
-		defer gz.Close()
+func HandleValue(b []byte) ([]byte, error) {
+	fmt.Println(needDecompress)
+	if needDecompress {
+		return Compress(b)
 	} else {
-		reader = r.Body
+		return b, nil
 	}
-
-	body, err := io.ReadAll(reader)
-	if err != nil {
-		return "", err
-	}
-	return strconv.Itoa(len(body)), nil
 }
 
 func GzipHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") || !strings.Contains(r.Header.Get("Content-Type"), "application/json") {
+
+		if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") &&
+			strings.Contains(r.Header.Get("Content-Type"), "application/json")) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		//body, _ := io.ReadAll(r.Body)
-		//fmt.Println(string(body))
-		////gunzip, err := Decompress(body)
-		////fmt.Println(gunzip)
-		//
-		//gzipw, err := gzip.NewWriterLevel(w, flate.BestCompression)
-		//if err != nil {
-		//	_, err := io.WriteString(w, err.Error())
-		//	if err != nil {
-		//		logger.PrintLog(logger.FATAL, "Can not write string")
-		//		return
-		//	}
-		//	return
-		//}
-		//
-		//defer gzipw.Close()
-		//
-		////bodyLen, _ := LengthHandle(w, r)
-		//
-		//w.Header().Set("Content-Encoding", "gzip")
-		////w.Header().Set("Content-Length", bodyLen)
-		//_, err = gzipw.Write(body)
-		//if err != nil {
-		//	return
-		//}
-		//
-		//logger.PrintLog(logger.INFO, "Serve gzip...")
-		//
-		//next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gzipw}, r)
+		needDecompress = true
+
+		w.Header().Set("Content-Encoding", "gzip")
+
+		next.ServeHTTP(GzipWriter{ResponseWriter: w}, r)
 	})
 }
 
