@@ -8,18 +8,25 @@ import (
 	"strings"
 )
 
-type GzipWriter struct {
-	http.ResponseWriter
-}
+//type GzipWriter struct {
+//	http.ResponseWriter
+//}
 
 //func (w GzipWriter) Write(b []byte) (int, error) {
 //	return w.Writer.Write(b)
 //}
 
-var needCompress = false
+var needCompress bool
+var needDecompress bool
 
-func HandleValue(b []byte) ([]byte, error) {
-	//fmt.Println(needCompress)
+func HandleInputValue(b []byte) ([]byte, error) {
+	if needDecompress {
+		return Decompress(b)
+	} else {
+		return b, nil
+	}
+}
+func HandleOutputValue(b []byte) ([]byte, error) {
 	if needCompress {
 		return Compress(b)
 	} else {
@@ -30,30 +37,34 @@ func HandleValue(b []byte) ([]byte, error) {
 func GzipHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		//if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")) {
-		//	needCompress = false
-		//	next.ServeHTTP(w, r)
-		//	return
-		//}
-		if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") &&
-			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/html"))) {
-			needCompress = false
+		needCompress = false
+		needDecompress = false
+
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") && !strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		needCompress = true
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			needCompress = true
+			w.Header().Set("Content-Encoding", "gzip")
+		}
 
-		w.Header().Set("Content-Encoding", "gzip")
+		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+			needDecompress = true
+		}
 
-		next.ServeHTTP(GzipWriter{ResponseWriter: w}, r)
+		next.ServeHTTP(w, r)
 
+		needDecompress = false
 		needCompress = false
 	})
 }
 
 // Compress сжимает слайс байт.
 func Compress(data []byte) ([]byte, error) {
+	fmt.Println("compress:")
+	fmt.Println(string(data))
 	var b bytes.Buffer
 	// создаём переменную w — в неё будут записываться входящие данные,
 	// которые будут сжиматься и сохраняться в bytes.Buffer
@@ -79,6 +90,9 @@ func Compress(data []byte) ([]byte, error) {
 
 // Decompress распаковывает слайс байт.
 func Decompress(data []byte) ([]byte, error) {
+	fmt.Println("decompress:")
+	fmt.Println(string(data))
+
 	// переменная r будет читать входящие данные и распаковывать их
 	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {

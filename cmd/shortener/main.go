@@ -73,6 +73,14 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		httpResp.BadRequest(res)
 		return
 	}
+
+	contentBody, errDecompress := compress.HandleInputValue(contentBody)
+	//fmt.Println(errDecompress)
+	if errDecompress != nil {
+		httpResp.InternalError(res)
+		return
+	}
+
 	rootPath, err := pathhandler.ProjectRoot()
 	if err != nil {
 		httpResp.InternalError(res)
@@ -104,9 +112,12 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		shortLink = linkDataSet.ShortLink
 	}
 	// Отдаем 201 ответ с шортлинком
+	shortLinkByte := []byte(shortLink)
+	shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
+	//fmt.Println(string(shortLinkByte))
 	additional := confModule.Additional{
 		Place:     "body",
-		InnerData: shortLink,
+		InnerData: string(shortLinkByte),
 	}
 	httpResp.Created(res, additional)
 }
@@ -175,7 +186,7 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	JSONResp, err = compress.HandleValue(JSONResp)
+	JSONResp, err = compress.HandleOutputValue(JSONResp)
 	if err != nil {
 		httpResp.InternalError(res)
 		return
