@@ -29,9 +29,14 @@ func HandleValue(b []byte) ([]byte, error) {
 
 func GzipHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(needCompress)
+
+		//if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip")) {
+		//	needCompress = false
+		//	next.ServeHTTP(w, r)
+		//	return
+		//}
 		if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") &&
-			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/html"))) {
+			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/plain"))) {
 			needCompress = false
 			next.ServeHTTP(w, r)
 			return

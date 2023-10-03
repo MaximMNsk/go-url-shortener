@@ -76,6 +76,7 @@ func Log(h http.Handler) http.Handler {
 			Str("Method", r.Method).
 			Str("Content-Type", r.Header.Get("Content-Type")).
 			Str("Accept-Encoding", r.Header.Get("Accept-Encoding")).
+			Str("Content-Encoding", r.Header.Get("Content-Encoding")).
 			Str("Body", string(body)).
 			Str("URL", fmt.Sprintf("%s%s%s", scheme, r.Host, r.URL.Path)).
 			Int("Status", responseData.status).
