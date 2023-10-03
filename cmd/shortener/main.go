@@ -8,6 +8,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/go-chi/chi/v5"
@@ -119,6 +120,10 @@ type output struct {
 
 func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	contentBody, errBody := io.ReadAll(req.Body)
+	fmt.Println(contentBody)
+	contentBody, errBody = compress.Decompress(contentBody)
+	fmt.Println(errBody)
+	fmt.Println(contentBody)
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
@@ -174,6 +179,10 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	httpResp.CreatedJSON(res, additional)
 }
 
+func handlePOSTOverJSONGzip(res http.ResponseWriter, req *http.Request) {
+	fmt.Println(req.Body, res.Header())
+}
+
 func handleOther(res http.ResponseWriter) {
 	httpResp.BadRequest(res)
 }
@@ -222,7 +231,7 @@ func main() {
 	}
 
 	logger.PrintLog(logger.INFO, "Declaring router")
-	r := chi.NewRouter().With(extlogger.Log)
+	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, ServeHTTP)
 		r.Post(`/api/shorten`, ServeHTTP)
