@@ -75,7 +75,6 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 
 	contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	//fmt.Println(errDecompress)
 	if errDecompress != nil {
 		httpResp.InternalError(res)
 		return
@@ -114,6 +113,10 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	// Отдаем 201 ответ с шортлинком
 	shortLinkByte := []byte(shortLink)
 	shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
+	if err != nil {
+		httpResp.InternalError(res)
+		return
+	}
 	//fmt.Println(string(shortLinkByte))
 	additional := confModule.Additional{
 		Place:     "body",
@@ -139,6 +142,13 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	contentBody, errBody := io.ReadAll(req.Body)
 	if errBody != nil {
 		httpResp.BadRequest(res)
+		return
+	}
+
+	contentBody, errDecompress := compress.HandleInputValue(contentBody)
+	//fmt.Println(errDecompress)
+	if errDecompress != nil {
+		httpResp.InternalError(res)
 		return
 	}
 
