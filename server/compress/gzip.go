@@ -19,7 +19,7 @@ type GzipWriter struct {
 var needCompress = false
 
 func HandleValue(b []byte) ([]byte, error) {
-	fmt.Println(needCompress)
+	//fmt.Println(needCompress)
 	if needCompress {
 		return Compress(b)
 	} else {
@@ -32,6 +32,7 @@ func GzipHandler(next http.Handler) http.Handler {
 
 		if !(strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") &&
 			(strings.Contains(r.Header.Get("Content-Type"), "application/json") || strings.Contains(r.Header.Get("Content-Type"), "text/html"))) {
+			needCompress = false
 			next.ServeHTTP(w, r)
 			return
 		}
