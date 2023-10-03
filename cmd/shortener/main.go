@@ -37,7 +37,6 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
-	//if strings.Contains(contentType, "text/plain") {
 	// Пришел ид
 	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
@@ -48,11 +47,12 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
+	link, _ := compress.HandleValue([]byte(linkData.Link))
 	if linkData.Link != "" {
 		additional := confModule.Additional{
 			Place:     "header",
 			OuterData: "Location",
-			InnerData: linkData.Link,
+			InnerData: string(link),
 		}
 		// Если есть, отдаем 307 редирект
 		httpResp.TempRedirect(res, additional)
