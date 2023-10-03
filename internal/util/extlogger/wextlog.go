@@ -3,6 +3,7 @@ package extlogger
 import (
 	"fmt"
 	"github.com/rs/zerolog"
+	"io"
 	"net/http"
 	"os"
 	"time"
@@ -67,10 +68,15 @@ func Log(h http.Handler) http.Handler {
 			scheme = "https://"
 		}
 
+		body, _ := io.ReadAll(r.Body)
+
 		log.Info().
 			Time("StartTime", start).
 			Float64("Duration", duration).
 			Str("Method", r.Method).
+			Str("Content-Type", r.Header.Get("Content-Type")).
+			Str("Accept-Encoding", r.Header.Get("Accept-Encoding")).
+			Str("Body", string(body)).
 			Str("URL", fmt.Sprintf("%s%s%s", scheme, r.Host, r.URL.Path)).
 			Int("Status", responseData.status).
 			Int("Size", responseData.size).
