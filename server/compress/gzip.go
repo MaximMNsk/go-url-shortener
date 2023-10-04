@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +15,8 @@ var needDecompress bool
 
 func HandleInputValue(b []byte) ([]byte, error) {
 	logger.PrintLog(logger.INFO, "HandleInputValue: "+string(b))
+	logger.PrintLog(logger.INFO, "needDecompress: "+strconv.FormatBool(needDecompress))
+
 	if needDecompress && b != nil {
 		return Decompress(b)
 	} else {
@@ -22,6 +25,7 @@ func HandleInputValue(b []byte) ([]byte, error) {
 }
 func HandleOutputValue(b []byte) ([]byte, error) {
 	logger.PrintLog(logger.INFO, "HandleOutputValue: "+string(b))
+	logger.PrintLog(logger.INFO, "needCompress: "+strconv.FormatBool(needCompress))
 	if needCompress && b != nil {
 		return Compress(b)
 	} else {
