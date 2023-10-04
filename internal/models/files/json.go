@@ -39,24 +39,21 @@ func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0755)
-	if err != nil {
-		return "", err
+	if err != nil && strings.Contains(err.Error(), "The system cannot find the path specified") {
+		return "[]", nil
 	}
 	defer func(f *os.File) {
 		err = f.Close()
 	}(f)
-	if err == nil {
-		for {
-			n, errRead := f.Read(data)
-			if errRead == io.EOF { // если конец файла
-				break // выходим из цикла
-			}
-			result += string(data[:n])
+
+	for {
+		n, errRead := f.Read(data)
+		if errRead == io.EOF { // если конец файла
+			break // выходим из цикла
 		}
+		result += string(data[:n])
 	}
-	if err != nil && strings.Contains(err.Error(), "The system cannot find the path specified") {
-		return "[]", nil
-	}
+
 	return result, err
 }
 

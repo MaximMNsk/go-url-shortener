@@ -61,6 +61,9 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+/**
+ * Обработка POST
+ */
 func handlePOST(res http.ResponseWriter, req *http.Request) {
 	//contentType := req.Header.Get("Content-Type")
 	//if contentType != "text/plain" {
