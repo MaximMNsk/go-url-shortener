@@ -12,14 +12,14 @@ var needCompress bool
 var needDecompress bool
 
 func HandleInputValue(b []byte) ([]byte, error) {
-	if needDecompress {
+	if needDecompress && b != nil {
 		return Decompress(b)
 	} else {
 		return b, nil
 	}
 }
 func HandleOutputValue(b []byte) ([]byte, error) {
-	if needCompress {
+	if needCompress && b != nil {
 		return Compress(b)
 	} else {
 		return b, nil
