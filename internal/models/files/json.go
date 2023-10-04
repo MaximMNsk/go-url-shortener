@@ -38,7 +38,7 @@ func (jsonData *JSONDataGet) Get(fileName string) error {
 func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
-	f, err := os.OpenFile(fileName, os.O_RDONLY, 0755)
+	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if err != nil {
 		return "[]", nil
 	}
@@ -86,13 +86,13 @@ func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
-		err = os.Mkdir(dir, 0777)
+		err = os.Mkdir(dir, 0644)
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Cannot create directory")
 		}
 	}
 
-	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Cannot create or open file")
 		return false
