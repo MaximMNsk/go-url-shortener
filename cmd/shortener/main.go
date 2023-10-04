@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+	"path/filepath"
 )
 
 /**
@@ -246,7 +247,9 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
+	thisPath, _ := filepath.Abs("")
 	logger.PrintLog(logger.INFO, "File path: "+confModule.Config.Final.LinkFile)
+	logger.PrintLog(logger.INFO, "This path: "+thisPath)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)
