@@ -81,10 +81,12 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
 	//fmt.Println(dir)
-
-	err := os.Mkdir(dir, 0777)
-	if err != nil {
-		return false
+	_, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(dir, 0777)
+		if err != nil {
+			return false
+		}
 	}
 
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)

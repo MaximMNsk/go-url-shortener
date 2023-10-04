@@ -76,12 +76,14 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 
 	contentBody, errDecompress := compress.HandleInputValue(contentBody)
 	if errDecompress != nil {
+		logger.PrintLog(logger.ERROR, "Can not decompress data")
 		httpResp.InternalError(res)
 		return
 	}
 
 	rootPath, err := pathhandler.ProjectRoot()
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not set root path")
 		httpResp.InternalError(res)
 		return
 	}
@@ -93,6 +95,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	// Проверяем, есть ли он (пока без валидаций).
 	err = linkDataGet.Get(linkFilePath)
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not link data")
 		httpResp.InternalError(res)
 		return
 	}
@@ -105,6 +108,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		linkDataSet.ID = linkID
 		err := linkDataSet.Set(linkFilePath)
 		if err != nil {
+			logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
 			httpResp.InternalError(res)
 			return
 		}
@@ -114,6 +118,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	shortLinkByte := []byte(shortLink)
 	shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not compress data")
 		httpResp.InternalError(res)
 		return
 	}
