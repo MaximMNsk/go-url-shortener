@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type JSONDataGet struct {
@@ -39,7 +38,7 @@ func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0755)
-	if err != nil && strings.Contains(err.Error(), "The system cannot find the path specified") {
+	if err != nil {
 		return "[]", nil
 	}
 	defer func(f *os.File) {
@@ -52,6 +51,10 @@ func getData(fileName string) (string, error) {
 			break // выходим из цикла
 		}
 		result += string(data[:n])
+	}
+
+	if result == "" {
+		result = "[]"
 	}
 
 	return result, err

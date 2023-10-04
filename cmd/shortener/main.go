@@ -6,7 +6,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
@@ -31,12 +30,21 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	//	httpResp.BadRequest(res)
 	//	return
 	//}
-	rootPath, err := pathhandler.ProjectRoot()
+
+	//rootPath, err := pathhandler.ProjectRoot()
+	//if err != nil {
+	//	httpResp.InternalError(res)
+	//	return
+	//}
+	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+
+	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not set root path")
 		httpResp.InternalError(res)
 		return
 	}
-	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+
 	// Пришел ид
 	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
@@ -84,13 +92,20 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	rootPath, err := pathhandler.ProjectRoot()
+	//rootPath, err := pathhandler.ProjectRoot()
+	//if err != nil {
+	//	logger.PrintLog(logger.ERROR, "Can not set root path")
+	//	httpResp.InternalError(res)
+	//	return
+	//}
+	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Can not set root path")
 		httpResp.InternalError(res)
 		return
 	}
-	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
@@ -158,13 +173,21 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	rootPath, err := pathhandler.ProjectRoot()
+	//rootPath, err := pathhandler.ProjectRoot()
+	//if err != nil {
+	//	httpResp.InternalError(res)
+	//	return
+	//}
+	//
+	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+
+	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not set root path")
 		httpResp.InternalError(res)
 		return
 	}
 
-	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
