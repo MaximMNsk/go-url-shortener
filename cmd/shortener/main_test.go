@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -79,9 +80,13 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
+	err := config.HandleConfig()
+	if err != nil {
+		return
+	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
 
+		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "Set link" {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)

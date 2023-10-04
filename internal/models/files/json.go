@@ -38,7 +38,10 @@ func (jsonData *JSONDataGet) Get(fileName string) error {
 func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
-	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
+	f, err := os.OpenFile(fileName, os.O_RDONLY, 0755)
+	if err != nil {
+		return "", err
+	}
 	defer func(f *os.File) {
 		err = f.Close()
 	}(f)
@@ -80,7 +83,6 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 
 func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
-	//fmt.Println(dir)
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
 		err = os.Mkdir(dir, 0777)

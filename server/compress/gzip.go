@@ -14,6 +14,7 @@ var needCompress bool
 var needDecompress bool
 
 func HandleInputValue(b []byte) ([]byte, error) {
+
 	logger.PrintLog(logger.INFO, "HandleInputValue: "+string(b))
 	logger.PrintLog(logger.INFO, "needDecompress: "+strconv.FormatBool(needDecompress))
 
@@ -24,8 +25,10 @@ func HandleInputValue(b []byte) ([]byte, error) {
 	}
 }
 func HandleOutputValue(b []byte) ([]byte, error) {
+
 	logger.PrintLog(logger.INFO, "HandleOutputValue: "+string(b))
 	logger.PrintLog(logger.INFO, "needCompress: "+strconv.FormatBool(needCompress))
+
 	if needCompress && b != nil {
 		return Compress(b)
 	} else {
@@ -87,9 +90,6 @@ func Compress(data []byte) ([]byte, error) {
 
 // Decompress распаковывает слайс байт.
 func Decompress(data []byte) ([]byte, error) {
-	fmt.Println("decompress:")
-	fmt.Println(string(data))
-
 	// переменная r будет читать входящие данные и распаковывать их
 	r, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {

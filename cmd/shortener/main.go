@@ -95,7 +95,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	// Проверяем, есть ли он (пока без валидаций).
 	err = linkDataGet.Get(linkFilePath)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not link data")
+		logger.PrintLog(logger.ERROR, "Can not get link data")
 		httpResp.InternalError(res)
 		return
 	}
@@ -122,7 +122,6 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	//fmt.Println(string(shortLinkByte))
 	additional := confModule.Additional{
 		Place:     "body",
 		InnerData: string(shortLinkByte),
@@ -151,7 +150,6 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	}
 
 	contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	//fmt.Println(errDecompress)
 	if errDecompress != nil {
 		httpResp.InternalError(res)
 		return
