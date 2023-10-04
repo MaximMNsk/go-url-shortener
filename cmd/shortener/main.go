@@ -36,7 +36,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
+	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 	// Пришел ид
 	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
@@ -85,7 +85,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
+	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
@@ -158,7 +158,7 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	linkFilePath := filepath.Join(rootPath, confModule.LinkFile)
+	linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
@@ -232,6 +232,8 @@ func main() {
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
+
+	logger.PrintLog(logger.INFO, "File path: "+confModule.Config.Final.LinkFile)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)

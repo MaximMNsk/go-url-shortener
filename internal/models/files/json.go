@@ -5,6 +5,8 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 type JSONDataGet struct {
@@ -49,6 +51,9 @@ func getData(fileName string) (string, error) {
 			result += string(data[:n])
 		}
 	}
+	if strings.Contains(err.Error(), "The system cannot find the path specified") {
+		return "[]", nil
+	}
 	return result, err
 }
 
@@ -74,7 +79,15 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 }
 
 func saveData(data []byte, fileName string) bool {
-	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	var dir = filepath.Dir(fileName)
+	//fmt.Println(dir)
+
+	err := os.Mkdir(dir, 0777)
+	if err != nil {
+		return false
+	}
+
+	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return false
 	}
