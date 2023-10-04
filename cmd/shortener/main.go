@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
-	"path/filepath"
 )
 
 /**
@@ -38,19 +37,14 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	//}
 	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 
-	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
-	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not set root path")
-		httpResp.InternalError(res)
-		return
-	}
+	linkFilePath := confModule.Config.Final.LinkFile
 
 	// Пришел ид
 	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
 	linkData.ID = requestID
 	// Проверяем, есть ли он.
-	err = linkData.Get(linkFilePath)
+	err := linkData.Get(linkFilePath)
 	if err != nil {
 		httpResp.InternalError(res)
 		return
@@ -99,19 +93,14 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	//	return
 	//}
 	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
-	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
-	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not set root path")
-		httpResp.InternalError(res)
-		return
-	}
+	linkFilePath := confModule.Config.Final.LinkFile
 
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
 	linkDataGet.Link = string(contentBody)
 	// Проверяем, есть ли он (пока без валидаций).
-	err = linkDataGet.Get(linkFilePath)
+	err := linkDataGet.Get(linkFilePath)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Can not get link data")
 		httpResp.InternalError(res)
@@ -181,18 +170,13 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	//
 	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 
-	linkFilePath, err := filepath.Abs(confModule.Config.Final.LinkFile)
-	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not set root path")
-		httpResp.InternalError(res)
-		return
-	}
+	linkFilePath := confModule.Config.Final.LinkFile
 
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
 	linkDataGet := files.JSONDataGet{}
 	var linkData input
-	err = json.Unmarshal(contentBody, &linkData)
+	err := json.Unmarshal(contentBody, &linkData)
 	if err != nil {
 		httpResp.InternalError(res)
 		return

@@ -3,8 +3,10 @@ package config
 import (
 	"flag"
 	"fmt"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/caarlos0/env/v6"
 	"net"
+	"path/filepath"
 	"strings"
 )
 
@@ -92,7 +94,8 @@ func HandleConfig() error {
 
 		Config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 		Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
-		Config.Default.LinkFile = "internal/storage/links.json"
+		rootPath, _ := pathhandler.ProjectRoot()
+		Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/links.json")
 
 		if Config.Env.AppAddr != "" {
 			Config.Final.AppAddr = Config.Env.AppAddr
