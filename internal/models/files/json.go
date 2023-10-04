@@ -51,7 +51,7 @@ func getData(fileName string) (string, error) {
 			result += string(data[:n])
 		}
 	}
-	if strings.Contains(err.Error(), "The system cannot find the path specified") {
+	if err != nil && strings.Contains(err.Error(), "The system cannot find the path specified") {
 		return "[]", nil
 	}
 	return result, err
