@@ -8,14 +8,6 @@ import (
 	"strings"
 )
 
-//type GzipWriter struct {
-//	http.ResponseWriter
-//}
-
-//func (w GzipWriter) Write(b []byte) (int, error) {
-//	return w.Writer.Write(b)
-//}
-
 var needCompress bool
 var needDecompress bool
 
@@ -63,8 +55,6 @@ func GzipHandler(next http.Handler) http.Handler {
 
 // Compress сжимает слайс байт.
 func Compress(data []byte) ([]byte, error) {
-	fmt.Println("compress:")
-	fmt.Println(string(data))
 	var b bytes.Buffer
 	// создаём переменную w — в неё будут записываться входящие данные,
 	// которые будут сжиматься и сохраняться в bytes.Buffer
