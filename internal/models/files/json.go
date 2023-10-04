@@ -3,6 +3,7 @@ package files
 import (
 	"encoding/json"
 	"errors"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"io"
 	"os"
 	"path/filepath"
@@ -83,16 +84,19 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 
 func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
-	_, err := os.Stat(dir)
+	fileInfo, err := os.Stat(dir)
+	logger.PrintLog(logger.INFO, "Directory info: "+fileInfo.Name())
 	if os.IsNotExist(err) {
 		err = os.Mkdir(dir, 0777)
 		if err != nil {
+			logger.PrintLog(logger.ERROR, "Cannot create directory")
 			return false
 		}
 	}
 
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
+		logger.PrintLog(logger.ERROR, "Cannot create file")
 		return false
 	}
 	defer func(f *os.File) {
