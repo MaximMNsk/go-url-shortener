@@ -154,6 +154,7 @@ func handlePOST(res updatedWriter, req *http.Request) {
 	}
 
 	linkFilePath := confModule.Config.Final.LinkFile
+	logger.PrintLog(logger.INFO, "Gzip. File: "+linkFilePath)
 
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
@@ -162,9 +163,9 @@ func handlePOST(res updatedWriter, req *http.Request) {
 	// Проверяем, есть ли он (пока без валидаций).
 	err := linkDataGet.Get(linkFilePath)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not get link data")
-		httpResp.InternalError(res)
-		return
+		logger.PrintLog(logger.WARN, "Can not get link data: "+err.Error())
+		//httpResp.InternalError(res)
+		//return
 	}
 	shortLink := linkDataGet.ShortLink
 	// Если нет, генерим ид, сохраняем
@@ -231,8 +232,9 @@ func handleAPI(res updatedWriter, req *http.Request) {
 	linkDataGet.Link = linkData.URL
 	err = linkDataGet.Get(linkFilePath)
 	if err != nil {
-		httpResp.InternalError(res)
-		return
+		logger.PrintLog(logger.WARN, "Can not get link data: "+err.Error())
+		//httpResp.InternalError(res)
+		//return
 	}
 	shortLink := linkDataGet.ShortLink
 	// Если нет, генерим ид, сохраняем
