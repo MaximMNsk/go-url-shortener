@@ -101,14 +101,15 @@ func saveData(data []byte, fileName string) bool {
 	logger.PrintLog(logger.INFO, "Directory created")
 
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	defer func(f *os.File) {
+		err = f.Close()
+	}(f)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Cannot create or open file: "+err.Error())
 		return false
 	}
+
 	logger.PrintLog(logger.INFO, "File "+fileName+" successfully opened or created")
-	defer func(f *os.File) {
-		err = f.Close()
-	}(f)
 
 	_, err = f.Write(data)
 	if err != nil {
