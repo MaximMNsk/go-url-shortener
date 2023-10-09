@@ -77,8 +77,10 @@ func GzipHandler(next http.Handler) http.Handler {
 		if r.Method == "POST" {
 			if r.RequestURI == "/" {
 				handlePOST(newWriter, r)
+				return
 			} else {
 				handleAPI(newWriter, r)
+				return
 			}
 		}
 
