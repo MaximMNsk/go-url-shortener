@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
-	"path/filepath"
 )
 
 /**
@@ -31,8 +30,9 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	// Проверяем, есть ли ссылка
 	err := linkData.Get(linkFilePath)
 	if err != nil {
-		httpResp.InternalError(res)
-		return
+		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
+		//httpResp.InternalError(res)
+		//return
 	}
 	if linkData.Link != "" {
 		additional := confModule.Additional{
@@ -75,9 +75,9 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	// Проверяем, есть ли он (пока без валидаций).
 	err := linkDataGet.Get(linkFilePath)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not get link data")
-		httpResp.InternalError(res)
-		return
+		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
+		//httpResp.InternalError(res)
+		//return
 	}
 	shortLink := linkDataGet.ShortLink
 	// Если нет, генерим ид, сохраняем
@@ -144,8 +144,9 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 	linkDataGet.Link = linkData.URL
 	err = linkDataGet.Get(linkFilePath)
 	if err != nil {
-		httpResp.InternalError(res)
-		return
+		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
+		//httpResp.InternalError(res)
+		//return
 	}
 	shortLink := linkDataGet.ShortLink
 	// Если нет, генерим ид, сохраняем
@@ -206,9 +207,9 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
-	thisPath, _ := filepath.Abs("")
+	//thisPath, _ := filepath.Abs("")
 	logger.PrintLog(logger.INFO, "File path: "+confModule.Config.Final.LinkFile)
-	logger.PrintLog(logger.INFO, "This path: "+thisPath)
+	//logger.PrintLog(logger.INFO, "This path: "+thisPath)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)

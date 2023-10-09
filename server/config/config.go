@@ -77,8 +77,9 @@ func (config *OuterConfig) handleFinal() error {
 			config.Final.ShortURLAddr = "http://" + config.Final.ShortURLAddr
 		}
 	}
-	//if config.Final.LinkFile[0:1] == "/" {
-	//	config.Final.LinkFile = config.Final.LinkFile[1:]
+	config.Final.LinkFile = filepath.Join(config.Final.LinkFile)
+	//if config.Final.LinkFile[0:1] == "\\" { // Fix for Win
+	//	config.Final.LinkFile = ".\\" + config.Final.LinkFile[1:]
 	//}
 	return err
 }

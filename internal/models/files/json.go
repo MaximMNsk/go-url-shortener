@@ -88,18 +88,24 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
 	_, err := os.Stat(dir)
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Cannot get stat directory: "+err.Error())
+	}
 	if os.IsNotExist(err) {
 		err = os.Mkdir(dir, 0644)
 		if err != nil {
-			logger.PrintLog(logger.ERROR, "Cannot create directory")
+			logger.PrintLog(logger.ERROR, "Cannot create directory: "+err.Error())
 		}
 	}
 
+	logger.PrintLog(logger.INFO, "Directory created")
+
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Cannot create or open file")
+		logger.PrintLog(logger.ERROR, "Cannot create or open file: "+err.Error())
 		return false
 	}
+	logger.PrintLog(logger.INFO, "File "+fileName+" successfully opened or created")
 	defer func(f *os.File) {
 		err = f.Close()
 	}(f)
