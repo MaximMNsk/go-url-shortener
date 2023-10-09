@@ -58,6 +58,10 @@ func GzipHandler(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if r.Method == "GET" {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		newWriter.Compress.Compress = false
 		newWriter.Compress.Decompress = false
