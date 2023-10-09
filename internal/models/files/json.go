@@ -40,7 +40,7 @@ func getData(fileName string) (string, error) {
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if err != nil {
-		return "[]", nil
+		return "[]", err
 	}
 	defer func(f *os.File) {
 		err = f.Close()
@@ -50,6 +50,9 @@ func getData(fileName string) (string, error) {
 		n, errRead := f.Read(data)
 		if errRead == io.EOF { // если конец файла
 			break // выходим из цикла
+		}
+		if errRead != nil {
+			return "[]", errRead
 		}
 		result += string(data[:n])
 	}

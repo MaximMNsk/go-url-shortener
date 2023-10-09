@@ -2,11 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
@@ -20,23 +20,7 @@ import (
  * Request type handlers
  */
 
-func getShortURL(hostPort, linkID string) string {
-	return fmt.Sprintf("%s/%s", hostPort, linkID)
-}
-
 func handleGET(res http.ResponseWriter, req *http.Request) {
-	//contentType := req.Header.Get("Content-Type")
-	//if contentType != "text/plain" {
-	//	httpResp.BadRequest(res)
-	//	return
-	//}
-
-	//rootPath, err := pathhandler.ProjectRoot()
-	//if err != nil {
-	//	httpResp.InternalError(res)
-	//	return
-	//}
-	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 
 	linkFilePath := confModule.Config.Final.LinkFile
 
@@ -44,7 +28,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
 	linkData.ID = requestID
-	// Проверяем, есть ли он.
+	// Проверяем, есть ли ссылка
 	err := linkData.Get(linkFilePath)
 	if err != nil {
 		httpResp.InternalError(res)
@@ -68,11 +52,6 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
  * Обработка POST
  */
 func handlePOST(res http.ResponseWriter, req *http.Request) {
-	//contentType := req.Header.Get("Content-Type")
-	//if contentType != "text/plain" {
-	//	httpResp.BadRequest(res)
-	//	return
-	//}
 
 	contentBody, errBody := io.ReadAll(req.Body)
 	if errBody != nil {
@@ -80,20 +59,13 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	if errDecompress != nil {
-		logger.PrintLog(logger.ERROR, "Can not decompress data")
-		httpResp.InternalError(res)
-		return
-	}
-
-	//rootPath, err := pathhandler.ProjectRoot()
-	//if err != nil {
-	//	logger.PrintLog(logger.ERROR, "Can not set root path")
+	//contentBody, errDecompress := compress.HandleInputValue(contentBody)
+	//if errDecompress != nil {
+	//	logger.PrintLog(logger.ERROR, "Can not decompress data")
 	//	httpResp.InternalError(res)
 	//	return
 	//}
-	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
+
 	linkFilePath := confModule.Config.Final.LinkFile
 
 	// Пришел урл
@@ -112,7 +84,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	if linkDataGet.ID == "" {
 		linkDataSet := files.JSONDataSet{}
 		linkDataSet.Link = string(contentBody)
-		linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkDataSet.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
 		linkDataSet.ID = linkID
 		err := linkDataSet.Set(linkFilePath)
 		if err != nil {
@@ -124,12 +96,12 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 	// Отдаем 201 ответ с шортлинком
 	shortLinkByte := []byte(shortLink)
-	shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
-	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can not compress data")
-		httpResp.InternalError(res)
-		return
-	}
+	//shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
+	//if err != nil {
+	//	logger.PrintLog(logger.ERROR, "Can not compress data")
+	//	httpResp.InternalError(res)
+	//	return
+	//}
 	additional := confModule.Additional{
 		Place:     "body",
 		InnerData: string(shortLinkByte),
@@ -144,12 +116,7 @@ type output struct {
 	Result string `json:"result"`
 }
 
-func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
-	//contentType := req.Header.Get("Content-Type")
-	//if contentType != "application/json" {
-	//	httpResp.BadRequest(res)
-	//	return
-	//}
+func handleAPI(res http.ResponseWriter, req *http.Request) {
 
 	contentBody, errBody := io.ReadAll(req.Body)
 	if errBody != nil {
@@ -157,19 +124,11 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	if errDecompress != nil {
-		httpResp.InternalError(res)
-		return
-	}
-
-	//rootPath, err := pathhandler.ProjectRoot()
-	//if err != nil {
+	//contentBody, errDecompress := compress.HandleInputValue(contentBody)
+	//if errDecompress != nil {
 	//	httpResp.InternalError(res)
 	//	return
 	//}
-	//
-	//linkFilePath := filepath.Join(rootPath, confModule.Config.Final.LinkFile)
 
 	linkFilePath := confModule.Config.Final.LinkFile
 
@@ -193,7 +152,7 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 	if linkDataGet.ID == "" {
 		linkDataSet := files.JSONDataSet{}
 		linkDataSet.Link = linkData.URL
-		linkDataSet.ShortLink = getShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkDataSet.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
 		linkDataSet.ID = linkID
 		err := linkDataSet.Set(linkFilePath)
 		if err != nil {
@@ -210,11 +169,11 @@ func handlePOSTOverJSON(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	JSONResp, err = compress.HandleOutputValue(JSONResp)
-	if err != nil {
-		httpResp.InternalError(res)
-		return
-	}
+	//JSONResp, err = compress.HandleOutputValue(JSONResp)
+	//if err != nil {
+	//	httpResp.InternalError(res)
+	//	return
+	//}
 	// Отдаем 201 ответ с шортлинком
 	additional := confModule.Additional{
 		Place:     "body",
@@ -255,7 +214,7 @@ func main() {
 	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
-		r.Post(`/api/shorten`, handlePOSTOverJSON)
+		r.Post(`/api/shorten`, handleAPI)
 		r.Get(`/{test}`, handleGET)
 	})
 

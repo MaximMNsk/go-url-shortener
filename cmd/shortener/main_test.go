@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func Test_getShortURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, getShortURL(tt.args.hostPort, tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
+			assert.Equalf(t, tt.want, shorter.GetShortURL(tt.args.hostPort, tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
 		})
 	}
 }
