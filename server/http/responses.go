@@ -3,7 +3,6 @@ package http
 import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"net/http"
-	"strconv"
 )
 
 /**
@@ -23,8 +22,8 @@ func TempRedirect(w http.ResponseWriter, addData confModule.Additional) {
 }
 func successAnswer(w http.ResponseWriter, status int, additionalData confModule.Additional) {
 	w.Header().Add("Content-Type", "text/plain")
-	dataLength := len(additionalData.InnerData)
-	w.Header().Add("Content-Length", strconv.Itoa(dataLength))
+	//dataLength := len(additionalData.InnerData)
+	//w.Header().Add("Content-Length", strconv.Itoa(dataLength))
 	if additionalData.Place == "header" {
 		w.Header().Add(additionalData.OuterData, additionalData.InnerData)
 	}
@@ -40,8 +39,8 @@ func Created(w http.ResponseWriter, addData confModule.Additional) {
 
 func successAnswerJSON(w http.ResponseWriter, status int, additionalData confModule.Additional) {
 	w.Header().Add("Content-Type", "application/json")
-	dataLength := len(additionalData.InnerData)
-	w.Header().Add("Content-Length", strconv.Itoa(dataLength))
+	//dataLength := len(additionalData.InnerData)
+	//w.Header().Add("Content-Length", strconv.Itoa(dataLength))
 	if additionalData.Place == "header" {
 		w.Header().Add(additionalData.OuterData, additionalData.InnerData)
 	}

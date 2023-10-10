@@ -54,17 +54,11 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 func handlePOST(res http.ResponseWriter, req *http.Request) {
 
 	contentBody, errBody := io.ReadAll(req.Body)
+	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
 	}
-
-	//contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	//if errDecompress != nil {
-	//	logger.PrintLog(logger.ERROR, "Can not decompress data")
-	//	httpResp.InternalError(res)
-	//	return
-	//}
 
 	linkFilePath := confModule.Config.Final.LinkFile
 
@@ -96,12 +90,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 	// Отдаем 201 ответ с шортлинком
 	shortLinkByte := []byte(shortLink)
-	//shortLinkByte, err = compress.HandleOutputValue(shortLinkByte)
-	//if err != nil {
-	//	logger.PrintLog(logger.ERROR, "Can not compress data")
-	//	httpResp.InternalError(res)
-	//	return
-	//}
+
 	additional := confModule.Additional{
 		Place:     "body",
 		InnerData: string(shortLinkByte),

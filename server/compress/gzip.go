@@ -2,6 +2,7 @@ package compress
 
 import (
 	"compress/gzip"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"io"
 	"net/http"
 	"strings"
@@ -77,6 +78,7 @@ func GzipHandler(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+
 		ow := w
 
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
@@ -85,10 +87,16 @@ func GzipHandler(next http.Handler) http.Handler {
 		if supportsGzip {
 			// оборачиваем оригинальный http.ResponseWriter новым с поддержкой сжатия
 			cw := newCompressWriter(w)
+			cw.Header().Set("Content-Encoding", "gzip")
 			// меняем оригинальный http.ResponseWriter на новый
 			ow = cw
 			// не забываем отправить клиенту все сжатые данные после завершения middleware
-			defer cw.Close()
+			defer func(cw *compressWriter) {
+				err := cw.Close()
+				if err != nil {
+					logger.PrintLog(logger.ERROR, "Can't close compress writer: "+err.Error())
+				}
+			}(cw)
 		}
 
 		// проверяем, что клиент отправил серверу сжатые данные в формате gzip
@@ -103,7 +111,12 @@ func GzipHandler(next http.Handler) http.Handler {
 			}
 			// меняем тело запроса на новое
 			r.Body = cr
-			defer cr.Close()
+			defer func(cr *compressReader) {
+				err := cr.Close()
+				if err != nil {
+					logger.PrintLog(logger.ERROR, "Can't close compress reader")
+				}
+			}(cr)
 		}
 
 		// передаём управление хендлеру
