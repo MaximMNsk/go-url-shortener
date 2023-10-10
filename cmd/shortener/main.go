@@ -34,6 +34,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 		//httpResp.InternalError(res)
 		//return
 	}
+	logger.PrintLog(logger.INFO, "Received link: "+linkData.Link)
 	if linkData.Link != "" {
 		additional := confModule.Additional{
 			Place:     "header",

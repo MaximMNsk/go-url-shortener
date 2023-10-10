@@ -44,6 +44,9 @@ func getData(fileName string) (string, error) {
 	}
 	defer func(f *os.File) {
 		err = f.Close()
+		if err != nil {
+			logger.PrintLog(logger.ERROR, "Close file error: "+err.Error())
+		}
 	}(f)
 
 	for {
@@ -68,48 +71,61 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 	var toSave []JSONDataSet
 	var savedData []JSONDataSet
 	jsonString, err := getData(fileName)
-	if err == nil {
-		err = json.Unmarshal([]byte(jsonString), &savedData)
-		if err == nil {
-			toSave = append(savedData, jsonData)
-			var content []byte
-			content, err = json.Marshal(toSave)
-			if err == nil {
-				isOk := saveData(content, fileName)
-				if !isOk {
-					err = errors.New("cant save")
-				}
-			}
-		}
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Setter. Json string: "+jsonString+". Error: "+err.Error())
 	}
+	//if err == nil {
+	err = json.Unmarshal([]byte(jsonString), &savedData)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Setter. Unmarshal json string: "+jsonString+". Error: "+err.Error())
+	}
+	//if err == nil {
+	toSave = append(savedData, jsonData)
+	var content []byte
+	content, err = json.Marshal(toSave)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Setter. Marshal new json string: "+jsonString+". Error: "+err.Error())
+	}
+
+	//if err == nil {
+	isOk := saveData(content, fileName)
+	if !isOk {
+		err = errors.New("can't save")
+		logger.PrintLog(logger.ERROR, "Setter. Save new content: "+string(content)+". Error: "+err.Error())
+	}
+	//}
+	//}
+	//}
 	return err
 }
 
 func saveData(data []byte, fileName string) bool {
 	var dir = filepath.Dir(fileName)
+	logger.PrintLog(logger.INFO, "Saver. Extracted dir: "+dir)
 	_, err := os.Stat(dir)
 	if err != nil {
-		logger.PrintLog(logger.WARN, "Cannot get stat directory: "+err.Error())
+		logger.PrintLog(logger.WARN, "Saver. Cannot get stat directory: "+err.Error())
 	}
 	if os.IsNotExist(err) {
+		logger.PrintLog(logger.INFO, "Saver. Creating dir: "+dir)
 		err = os.Mkdir(dir, 0644)
 		if err != nil {
-			logger.PrintLog(logger.ERROR, "Cannot create directory: "+err.Error())
+			logger.PrintLog(logger.ERROR, "Saver. Cannot create directory: "+err.Error())
 		}
 	}
 
-	logger.PrintLog(logger.INFO, "Directory created")
+	logger.PrintLog(logger.INFO, "Saver. Directory created")
 
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	defer func(f *os.File) {
 		err = f.Close()
 	}(f)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Cannot create or open file: "+err.Error())
+		logger.PrintLog(logger.ERROR, "Saver. Cannot create or open file: "+err.Error())
 		return false
 	}
 
-	logger.PrintLog(logger.INFO, "File "+fileName+" successfully opened or created")
+	logger.PrintLog(logger.INFO, "Saver. File "+fileName+" successfully opened or created")
 
 	_, err = f.Write(data)
 	if err != nil {
