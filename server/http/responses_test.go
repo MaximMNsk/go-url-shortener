@@ -37,6 +37,7 @@ func TestBadRequest(t *testing.T) {
 			BadRequest(w)
 			result := w.Result()
 			assert.Equal(t, tt.want.status, result.StatusCode)
+			_ = result.Body.Close()
 		})
 	}
 }
@@ -68,6 +69,7 @@ func TestInternalError(t *testing.T) {
 			InternalError(w)
 			result := w.Result()
 			assert.Equal(t, tt.want.status, result.StatusCode)
+			_ = result.Body.Close()
 		})
 	}
 }
@@ -145,11 +147,6 @@ func TestCreated(t *testing.T) {
 			bodyResult, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				require.NoError(t, err)
-			}(result.Body)
-
 			if tt.name == "Created" {
 				require.NotEmpty(t, bodyResult)
 				assert.Equal(t, tt.want.body, string(bodyResult))
@@ -157,7 +154,7 @@ func TestCreated(t *testing.T) {
 			if tt.name == "TempRedirect" {
 				assert.Equal(t, tt.want.headers.location, result.Header.Get("Location"))
 			}
-
+			_ = result.Body.Close()
 		})
 	}
 }
