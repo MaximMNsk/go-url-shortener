@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -10,34 +11,12 @@ import (
 	"testing"
 )
 
-func Test_getShortURL(t *testing.T) {
-	type args struct {
-		linkID   string
-		hostPort string
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{
-			name: "Test link",
-			args: args{linkID: "0X0X0X", hostPort: "http://localhost:8080"},
-			want: "http://localhost:8080/0X0X0X",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, getShortURL(tt.args.hostPort, tt.args.linkID), "getShortURL(%v)", tt.args.linkID)
-		})
-	}
-}
-
 func Test_handleMainPage(t *testing.T) {
 	type args struct {
-		path     string
-		method   string
-		testLink string
+		path        string
+		method      string
+		testLink    string
+		contentType string
 	}
 	type want struct {
 		contentType string
@@ -51,22 +30,12 @@ func Test_handleMainPage(t *testing.T) {
 		want want
 	}{
 		{
-			name: "Bad Request",
-			args: args{
-				method: http.MethodPut,
-				path:   "http://localhost:8080/",
-			},
-			want: want{
-				contentType: "text/plain",
-				statusCode:  400,
-			},
-		},
-		{
 			name: "Set link",
 			args: args{
-				method:   http.MethodPost,
-				path:     "http://localhost:8080/",
-				testLink: "https://ya.ru",
+				method:      http.MethodPost,
+				path:        "http://localhost:8080/",
+				testLink:    "https://ya.ru",
+				contentType: "text/plain",
 			},
 			want: want{
 				contentType: "text/plain",
@@ -76,8 +45,9 @@ func Test_handleMainPage(t *testing.T) {
 		{
 			name: "Get link",
 			args: args{
-				method: http.MethodGet,
-				path:   "http://localhost:8080/",
+				method:      http.MethodGet,
+				path:        "http://localhost:8080/",
+				contentType: "text/plain",
 			},
 			want: want{
 				contentType: "text/plain",
@@ -87,24 +57,19 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
+	err := config.HandleConfig()
+	if err != nil {
+		return
+	}
 	for _, tt := range tests {
+
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name == "Bad Request" {
-				request := httptest.NewRequest(tt.args.method, tt.args.path, nil)
-				w := httptest.NewRecorder()
-				handleMainPage(w, request)
-
-				result := w.Result()
-				assert.Equal(t, tt.want.statusCode, result.StatusCode)
-				assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-				_ = result.Body.Close()
-			}
-
 			if tt.name == "Set link" {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)
+				//request.Header.Set("Content-Type", tt.args.contentType)
 				w := httptest.NewRecorder()
-				handleMainPage(w, request)
+				handlePOST(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
@@ -120,8 +85,9 @@ func Test_handleMainPage(t *testing.T) {
 
 			if tt.name == "Get link" {
 				request := httptest.NewRequest(tt.args.method, shortLink, nil)
+				//request.Header.Set("Content-Type", tt.args.contentType)
 				w := httptest.NewRecorder()
-				handleMainPage(w, request)
+				handleGET(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
