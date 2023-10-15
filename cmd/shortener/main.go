@@ -37,7 +37,8 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 
 	// Пришел ид
 	linkData := files.JSONDataGet{}
-	requestID := req.URL.Path[1:]
+	requestID := chi.URLParam(req, "query")
+	logger.PrintLog(logger.INFO, requestID)
 	linkData.ID = requestID
 	// Проверяем, есть ли ссылка
 	err := linkData.Get(linkFilePath)
@@ -54,10 +55,14 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 			InnerData: linkData.Link,
 		}
 		// Если есть, отдаем 307 редирект
+		logger.PrintLog(logger.INFO, "Success")
 		httpResp.TempRedirect(res, additional)
+		return
 	} else {
 		// Если нет, отдаем BadRequest
+		logger.PrintLog(logger.WARN, "Not success")
 		httpResp.BadRequest(res)
+		return
 	}
 }
 
@@ -207,8 +212,8 @@ func main() {
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
 		r.Post(`/api/shorten`, handleAPI)
-		r.Get(`/{test}`, handleGET)
 		r.Get(`/ping`, handlePing)
+		r.Get(`/{query}`, handleGET)
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")
