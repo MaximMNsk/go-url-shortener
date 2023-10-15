@@ -25,7 +25,7 @@ type OuterConfig struct {
 		AppAddr      string `env:"SERVER_ADDRESS"`
 		ShortURLAddr string `env:"BASE_URL"`
 		LinkFile     string `env:"FILE_STORAGE_PATH"`
-		DB           string
+		DB           string `env:"DATABASE_DSN"`
 	}
 	Flag struct {
 		AppAddr      string
@@ -50,10 +50,10 @@ var Config OuterConfig
 // parseFlags обрабатывает аргументы командной строки
 // и сохраняет их значения в соответствующих переменных
 func parseFlags() {
-	flag.StringVar(&Config.Env.AppAddr, "a", "", "address and port to run server")
-	flag.StringVar(&Config.Env.ShortURLAddr, "b", "", "address and port to short link")
-	flag.StringVar(&Config.Env.LinkFile, "f", "", "path to file with links")
-	flag.StringVar(&Config.Env.DB, "d", "", "db connection")
+	flag.StringVar(&Config.Flag.AppAddr, "a", "", "address and port to run server")
+	flag.StringVar(&Config.Flag.ShortURLAddr, "b", "", "address and port to short link")
+	flag.StringVar(&Config.Flag.LinkFile, "f", "", "path to file with links")
+	flag.StringVar(&Config.Flag.DB, "d", "", "db connection")
 
 	flag.Parse()
 }
@@ -83,14 +83,21 @@ func setDefaults() {
 	Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
 }
 
-func HandleConfig() error {
-
+func parseEnv() {
 	err := env.Parse(&Config.Env)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Can't parse ENV")
 	}
+}
+
+func HandleConfig() error {
+
+	parseEnv()
 	parseFlags()
 	setDefaults()
+
+	fmt.Println(Config.Flag)
+	fmt.Println(Config.Env)
 
 	if Config.Env.AppAddr != "" {
 		Config.Final.AppAddr = Config.Env.AppAddr
@@ -124,6 +131,6 @@ func HandleConfig() error {
 		Config.Final.DB = Config.Default.DB
 	}
 
-	err = Config.handleFinal()
+	err := Config.handleFinal()
 	return err
 }
