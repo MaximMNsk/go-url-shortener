@@ -14,38 +14,35 @@ import (
 var appAddr string
 var shortURLAddr string
 var linkFile string
+var db string
 
 const localHost = "http://localhost"
 const localPort = "8080"
-
-//var LinkFile = "internal/storage/links.json"
-
-type Additional struct {
-	Place     string
-	OuterData string
-	InnerData string
-}
 
 type OuterConfig struct {
 	Default struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
+		Db           string
 	}
 	Env struct {
 		AppAddr      string `env:"SERVER_ADDRESS"`
 		ShortURLAddr string `env:"BASE_URL"`
 		LinkFile     string `env:"FILE_STORAGE_PATH"`
+		Db           string
 	}
 	Flag struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
+		Db           string
 	}
 	Final struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
+		Db           string
 	}
 }
 
@@ -60,7 +57,8 @@ var Config OuterConfig
 func parseFlags() {
 	flag.StringVar(&appAddr, "a", "", "address and port to run server")
 	flag.StringVar(&shortURLAddr, "b", "", "address and port to short link")
-	flag.StringVar(&linkFile, "f", "", "path to fila with links")
+	flag.StringVar(&linkFile, "f", "", "path to file with links")
+	flag.StringVar(&db, "d", "", "db connection")
 
 	flag.Parse()
 }
@@ -78,9 +76,7 @@ func (config *OuterConfig) handleFinal() error {
 		}
 	}
 	config.Final.LinkFile = filepath.Join(config.Final.LinkFile)
-	//if config.Final.LinkFile[0:1] == "\\" { // Fix for Win
-	//	config.Final.LinkFile = ".\\" + config.Final.LinkFile[1:]
-	//}
+
 	return err
 }
 
@@ -97,10 +93,11 @@ func HandleConfig() error {
 		Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 		rootPath, _ := pathhandler.ProjectRoot()
 		Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/links.json")
+		Config.Default.Db = "user=postgres password=12345 dbname=postgres sslmode=disable"
 
 		if Config.Env.AppAddr != "" {
 			Config.Final.AppAddr = Config.Env.AppAddr
-		} else if Config.Flag.AppAddr != "" /*&& config.Env.AppAddr == ""*/ {
+		} else if Config.Flag.AppAddr != "" {
 			Config.Final.AppAddr = Config.Flag.AppAddr
 		} else {
 			Config.Final.AppAddr = Config.Default.AppAddr
@@ -108,7 +105,7 @@ func HandleConfig() error {
 
 		if Config.Env.ShortURLAddr != "" {
 			Config.Final.ShortURLAddr = Config.Env.ShortURLAddr
-		} else if Config.Flag.ShortURLAddr != "" /*&& config.Env.ShortURLAddr == ""*/ {
+		} else if Config.Flag.ShortURLAddr != "" {
 			Config.Final.ShortURLAddr = Config.Flag.ShortURLAddr
 		} else {
 			Config.Final.ShortURLAddr = Config.Default.ShortURLAddr
@@ -116,10 +113,18 @@ func HandleConfig() error {
 
 		if Config.Env.LinkFile != "" {
 			Config.Final.LinkFile = Config.Env.LinkFile
-		} else if Config.Flag.LinkFile != "" /*&& config.Env.ShortURLAddr == ""*/ {
+		} else if Config.Flag.LinkFile != "" {
 			Config.Final.LinkFile = Config.Flag.LinkFile
 		} else {
 			Config.Final.LinkFile = Config.Default.LinkFile
+		}
+
+		if Config.Env.Db != "" {
+			Config.Final.Db = Config.Env.Db
+		} else if Config.Flag.Db != "" {
+			Config.Final.Db = Config.Flag.Db
+		} else {
+			Config.Final.Db = Config.Default.Db
 		}
 
 		err = Config.handleFinal()

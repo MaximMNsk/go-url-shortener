@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
+	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
@@ -18,6 +19,17 @@ import (
 /**
  * Request type handlers
  */
+
+func handlePing(res http.ResponseWriter, req *http.Request) {
+	err := db.Connect()
+	defer db.Close()
+	if err != nil {
+		logger.PrintLog(logger.ERROR, err.Error())
+		httpResp.InternalError(res)
+		return
+	}
+	httpResp.Ok(res)
+}
 
 func handleGET(res http.ResponseWriter, req *http.Request) {
 
@@ -36,7 +48,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	}
 	logger.PrintLog(logger.INFO, "Received link: "+linkData.Link)
 	if linkData.Link != "" {
-		additional := confModule.Additional{
+		additional := httpResp.Additional{
 			Place:     "header",
 			OuterData: "Location",
 			InnerData: linkData.Link,
@@ -92,7 +104,7 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	// Отдаем 201 ответ с шортлинком
 	shortLinkByte := []byte(shortLink)
 
-	additional := confModule.Additional{
+	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: string(shortLinkByte),
 	}
@@ -113,12 +125,6 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 		httpResp.BadRequest(res)
 		return
 	}
-
-	//contentBody, errDecompress := compress.HandleInputValue(contentBody)
-	//if errDecompress != nil {
-	//	httpResp.InternalError(res)
-	//	return
-	//}
 
 	linkFilePath := confModule.Config.Final.LinkFile
 
@@ -160,13 +166,8 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 		httpResp.InternalError(res)
 		return
 	}
-	//JSONResp, err = compress.HandleOutputValue(JSONResp)
-	//if err != nil {
-	//	httpResp.InternalError(res)
-	//	return
-	//}
 	// Отдаем 201 ответ с шортлинком
-	additional := confModule.Additional{
+	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: string(JSONResp),
 	}
@@ -207,6 +208,7 @@ func main() {
 		r.Post(`/`, handlePOST)
 		r.Post(`/api/shorten`, handleAPI)
 		r.Get(`/{test}`, handleGET)
+		r.Get(`/ping`, handlePing)
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")
