@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-// Не экспортированная переменная AppAddr содержит адрес и порт для запуска сервера
-var appAddr string
-var shortURLAddr string
-var linkFile string
-var db string
-
 const localHost = "http://localhost"
 const localPort = "8080"
 
@@ -55,10 +49,10 @@ var Config OuterConfig
 // parseFlags обрабатывает аргументы командной строки
 // и сохраняет их значения в соответствующих переменных
 func parseFlags() {
-	flag.StringVar(&appAddr, "a", "", "address and port to run server")
-	flag.StringVar(&shortURLAddr, "b", "", "address and port to short link")
-	flag.StringVar(&linkFile, "f", "", "path to file with links")
-	flag.StringVar(&db, "d", "", "db connection")
+	flag.StringVar(&Config.Env.AppAddr, "a", "", "address and port to run server")
+	flag.StringVar(&Config.Env.ShortURLAddr, "b", "", "address and port to short link")
+	flag.StringVar(&Config.Env.LinkFile, "f", "", "path to file with links")
+	flag.StringVar(&Config.Env.DB, "d", "", "db connection")
 
 	flag.Parse()
 }
@@ -85,9 +79,6 @@ func HandleConfig() error {
 	err := env.Parse(&Config.Env)
 	if err == nil {
 		parseFlags()
-		Config.Flag.AppAddr = appAddr
-		Config.Flag.ShortURLAddr = shortURLAddr
-		Config.Flag.LinkFile = linkFile
 
 		Config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 		Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
