@@ -37,8 +37,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 
 	// Пришел ид
 	linkData := files.JSONDataGet{}
-	requestID := chi.URLParam(req, "query")
-	logger.PrintLog(logger.INFO, requestID)
+	requestID := req.URL.Path[1:]
 	linkData.ID = requestID
 	// Проверяем, есть ли ссылка
 	err := linkData.Get(linkFilePath)
@@ -212,7 +211,7 @@ func main() {
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
 		r.Post(`/api/shorten`, handleAPI)
-		r.Get(`/ping`, handlePing)
+		//r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)
 	})
 

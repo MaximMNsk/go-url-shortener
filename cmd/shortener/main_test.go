@@ -92,7 +92,7 @@ func Test_handleMainPage(t *testing.T) {
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)
 				assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-				assert.Equal(t, result.Header.Get("Location"), tt.want.response)
+				assert.Equal(t, tt.want.response, result.Header.Get("Location"))
 				_ = result.Body.Close()
 			}
 
