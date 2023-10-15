@@ -211,7 +211,7 @@ func main() {
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
 		r.Post(`/api/shorten`, handleAPI)
-		//r.Get(`/ping`, handlePing)
+		r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)
 	})
 
