@@ -1,7 +1,6 @@
 package http
 
 import (
-	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -12,7 +11,7 @@ import (
 
 func TestBadRequest(t *testing.T) {
 	type args struct {
-		addData config.Additional
+		addData Additional
 	}
 	type want struct {
 		status int
@@ -44,7 +43,7 @@ func TestBadRequest(t *testing.T) {
 
 func TestInternalError(t *testing.T) {
 	type args struct {
-		addData config.Additional
+		addData Additional
 	}
 	type want struct {
 		status int
@@ -76,7 +75,7 @@ func TestInternalError(t *testing.T) {
 
 func TestCreated(t *testing.T) {
 	type args struct {
-		addData config.Additional
+		addData Additional
 		status  int
 	}
 	type headers struct {
@@ -97,7 +96,7 @@ func TestCreated(t *testing.T) {
 		{
 			name: "Created",
 			args: args{
-				addData: config.Additional{
+				addData: Additional{
 					Place:     "Body",
 					OuterData: "",
 					InnerData: "some value",
@@ -112,7 +111,7 @@ func TestCreated(t *testing.T) {
 		{
 			name: "TempRedirect",
 			args: args{
-				addData: config.Additional{
+				addData: Additional{
 					Place:     "Header",
 					OuterData: "location",
 					InnerData: "some value",

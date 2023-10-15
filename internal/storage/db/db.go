@@ -14,7 +14,7 @@ var (
 
 func Connect() error {
 	ctx := context.Background()
-	database, err := pgx.Connect(ctx, config.Config.Final.Db)
+	database, err := pgx.Connect(ctx, config.Config.Final.DB)
 	db = database
 	return err
 }

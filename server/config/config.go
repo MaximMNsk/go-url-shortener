@@ -24,25 +24,25 @@ type OuterConfig struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
-		Db           string
+		DB           string
 	}
 	Env struct {
 		AppAddr      string `env:"SERVER_ADDRESS"`
 		ShortURLAddr string `env:"BASE_URL"`
 		LinkFile     string `env:"FILE_STORAGE_PATH"`
-		Db           string
+		DB           string
 	}
 	Flag struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
-		Db           string
+		DB           string
 	}
 	Final struct {
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
-		Db           string
+		DB           string
 	}
 }
 
@@ -93,7 +93,7 @@ func HandleConfig() error {
 		Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 		rootPath, _ := pathhandler.ProjectRoot()
 		Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/links.json")
-		Config.Default.Db = "user=postgres password=12345 dbname=postgres sslmode=disable"
+		Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
 
 		if Config.Env.AppAddr != "" {
 			Config.Final.AppAddr = Config.Env.AppAddr
@@ -119,12 +119,12 @@ func HandleConfig() error {
 			Config.Final.LinkFile = Config.Default.LinkFile
 		}
 
-		if Config.Env.Db != "" {
-			Config.Final.Db = Config.Env.Db
-		} else if Config.Flag.Db != "" {
-			Config.Final.Db = Config.Flag.Db
+		if Config.Env.DB != "" {
+			Config.Final.DB = Config.Env.DB
+		} else if Config.Flag.DB != "" {
+			Config.Final.DB = Config.Flag.DB
 		} else {
-			Config.Final.Db = Config.Default.Db
+			Config.Final.DB = Config.Default.DB
 		}
 
 		err = Config.handleFinal()
