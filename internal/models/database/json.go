@@ -54,19 +54,16 @@ func (jsonData *JSONData) Get() error {
 func getData(data JSONData) (JSONData, error) {
 	ctx := context.Background()
 	connection := db.GetDB()
-	if connection == nil {
-		return JSONData{}, errors.New("connection to DB not found")
-	}
 	selected := JSONData{}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
-	if row != nil {
-		err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
-		if err != nil {
-			logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
-		}
-		return selected, nil
+	if connection == nil {
+		return selected, errors.New("connection to DB not found")
 	}
-	return JSONData{}, nil
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
+	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
+	}
+	return selected, nil
 }
 
 func (jsonData *JSONData) Set() error {

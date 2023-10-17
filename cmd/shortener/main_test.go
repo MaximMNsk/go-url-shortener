@@ -67,7 +67,6 @@ func Test_handleMainPage(t *testing.T) {
 			if tt.name == "Set link" {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)
-				//request.Header.Set("Content-Type", tt.args.contentType)
 				w := httptest.NewRecorder()
 				handlePOST(w, request)
 
@@ -85,7 +84,6 @@ func Test_handleMainPage(t *testing.T) {
 
 			if tt.name == "Get link" {
 				request := httptest.NewRequest(tt.args.method, shortLink, nil)
-				//request.Header.Set("Content-Type", tt.args.contentType)
 				w := httptest.NewRecorder()
 				handleGET(w, request)
 
