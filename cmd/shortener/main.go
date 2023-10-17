@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
@@ -16,37 +17,89 @@ import (
 	"net/http"
 )
 
+var Storage string
+
 /**
  * Request type handlers
  */
 
 func handlePing(res http.ResponseWriter, req *http.Request) {
-	err := db.Connect()
-	defer db.Close()
-	if err != nil {
-		logger.PrintLog(logger.ERROR, err.Error())
-		httpResp.InternalError(res)
-		return
+	if db.GetDB() != nil {
+		err := db.Connect()
+		defer func() {
+			_ = db.Close()
+		}()
+		if err != nil {
+			logger.PrintLog(logger.ERROR, err.Error())
+			httpResp.InternalError(res)
+			return
+		}
 	}
 	httpResp.Ok(res)
 }
 
+type JSONData struct {
+	Link      string
+	ShortLink string
+	ID        string
+}
+
+func load(i JSONData, storage string) (JSONData, error) {
+	if storage == "database" {
+		linkData := database.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Get()
+		return JSONData(linkData), err
+	}
+	if (storage == "files") || (storage == "memory") {
+		linkData := files.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Get()
+		return JSONData(linkData), err
+	}
+	return JSONData{}, nil
+}
+
+func store(i JSONData, storage string) error {
+	if storage == "database" {
+		linkData := database.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Set()
+		return err
+	}
+	if (storage == "files") || (storage == "memory") {
+		linkData := files.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Set()
+		return err
+	}
+	return nil
+}
+
 func handleGET(res http.ResponseWriter, req *http.Request) {
 
-	linkFilePath := confModule.Config.Final.LinkFile
-
 	// Пришел ид
-	linkData := files.JSONDataGet{}
 	requestID := req.URL.Path[1:]
+	linkData := JSONData{}
 	linkData.ID = requestID
-	// Проверяем, есть ли ссылка
-	err := linkData.Get(linkFilePath)
+	linkData, err := load(linkData, Storage)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
-		//httpResp.InternalError(res)
-		//return
 	}
 	logger.PrintLog(logger.INFO, "Received link: "+linkData.Link)
+	// Проверяем, есть ли ссылка
 	if linkData.Link != "" {
 		additional := httpResp.Additional{
 			Place:     "header",
@@ -77,33 +130,28 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	linkFilePath := confModule.Config.Final.LinkFile
-
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
-	linkDataGet := files.JSONDataGet{}
-	linkDataGet.Link = string(contentBody)
-	// Проверяем, есть ли он (пока без валидаций).
-	err := linkDataGet.Get(linkFilePath)
+	linkData := JSONData{}
+	linkData.Link = string(contentBody)
+	linkData, err := load(linkData, Storage)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
-		//httpResp.InternalError(res)
-		//return
 	}
-	shortLink := linkDataGet.ShortLink
+	shortLink := linkData.ShortLink
 	// Если нет, генерим ид, сохраняем
-	if linkDataGet.ID == "" {
-		linkDataSet := files.JSONDataSet{}
-		linkDataSet.Link = string(contentBody)
-		linkDataSet.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-		linkDataSet.ID = linkID
-		err := linkDataSet.Set(linkFilePath)
+	if linkData.ID == "" {
+		linkData.Link = string(contentBody)
+		linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkData.ID = linkID
+		//err := linkDataSet.Set()
+		err := store(linkData, Storage)
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
 			httpResp.InternalError(res)
 			return
 		}
-		shortLink = linkDataSet.ShortLink
+		shortLink = linkData.ShortLink
 	}
 	// Отдаем 201 ответ с шортлинком
 	shortLinkByte := []byte(shortLink)
@@ -130,37 +178,35 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	linkFilePath := confModule.Config.Final.LinkFile
-
 	// Пришел урл
 	linkID := rand.RandStringBytes(8)
-	linkDataGet := files.JSONDataGet{}
-	var linkData input
-	err := json.Unmarshal(contentBody, &linkData)
+	//linkData := storage.JSONData{}
+	var apiData input
+	err := json.Unmarshal(contentBody, &apiData)
 	if err != nil {
 		httpResp.InternalError(res)
 		return
 	}
-	linkDataGet.Link = linkData.URL
-	err = linkDataGet.Get(linkFilePath)
+	linkData := JSONData{}
+	linkData.Link = apiData.URL
+	linkData, err = load(linkData, Storage)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
 		//httpResp.InternalError(res)
 		//return
 	}
-	shortLink := linkDataGet.ShortLink
+	shortLink := linkData.ShortLink
 	// Если нет, генерим ид, сохраняем
-	if linkDataGet.ID == "" {
-		linkDataSet := files.JSONDataSet{}
-		linkDataSet.Link = linkData.URL
-		linkDataSet.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-		linkDataSet.ID = linkID
-		err := linkDataSet.Set(linkFilePath)
+	if linkData.ID == "" {
+		linkData.Link = apiData.URL
+		linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		linkData.ID = linkID
+		err := store(linkData, Storage)
 		if err != nil {
 			httpResp.InternalError(res)
 			return
 		}
-		shortLink = linkDataSet.ShortLink
+		shortLink = linkData.ShortLink
 	}
 	var resp output
 	resp.Result = shortLink
@@ -202,12 +248,33 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
+	Storage = "memory"
+	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
+		Storage = "database"
+	}
+	if confModule.Config.Env.LinkFile != "" || confModule.Config.Flag.LinkFile != "" {
+		Storage = "files"
+	}
+
+	logger.PrintLog(logger.INFO, "Storage: "+Storage)
+
+	if Storage == "database" {
+		_ = db.Connect()
+		defer func() {
+			_ = db.Close()
+		}()
+		database.PrepareDB(db.GetDB())
+	}
+
 	//thisPath, _ := filepath.Abs("")
 	logger.PrintLog(logger.INFO, "File path: "+confModule.Config.Final.LinkFile)
 	//logger.PrintLog(logger.INFO, "This path: "+thisPath)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
-	r := chi.NewRouter().With(extlogger.Log).With(compress.GzipHandler).With(handleOther)
+	r := chi.NewRouter().
+		With(extlogger.Log).
+		With(compress.GzipHandler).
+		With(handleOther)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
 		r.Post(`/api/shorten`, handleAPI)

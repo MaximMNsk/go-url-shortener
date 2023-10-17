@@ -4,21 +4,24 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"io"
 	"os"
 	"path/filepath"
 )
 
-type JSONDataGet struct {
+type JSONData struct {
 	Link      string
 	ShortLink string
 	ID        string
 }
 
-type JSONDataSet JSONDataGet
+//type JSONDataSet JSONDataGet
 
-func (jsonData *JSONDataGet) Get(fileName string) error {
-	var savedData []JSONDataSet
+func (jsonData *JSONData) Get() error {
+	fileName := confModule.Config.Final.LinkFile
+	logger.PrintLog(logger.INFO, "Get from file: "+fileName)
+	var savedData []JSONData
 	jsonString, err := getData(fileName)
 	if err == nil {
 		err = json.Unmarshal([]byte(jsonString), &savedData)
@@ -67,9 +70,11 @@ func getData(fileName string) (string, error) {
 	return result, err
 }
 
-func (jsonData JSONDataSet) Set(fileName string) error {
-	var toSave []JSONDataSet
-	var savedData []JSONDataSet
+func (jsonData *JSONData) Set() error {
+	fileName := confModule.Config.Final.LinkFile
+	logger.PrintLog(logger.INFO, "Set to file: "+fileName)
+	var toSave []JSONData
+	var savedData []JSONData
 	jsonString, err := getData(fileName)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Setter. Json string: "+jsonString+". Error: "+err.Error())
@@ -80,7 +85,7 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 		logger.PrintLog(logger.ERROR, "Setter. Unmarshal json string: "+jsonString+". Error: "+err.Error())
 	}
 	//if err == nil {
-	toSave = append(savedData, jsonData)
+	toSave = append(savedData, *jsonData)
 	var content []byte
 	content, err = json.Marshal(toSave)
 	if err != nil {
@@ -93,9 +98,6 @@ func (jsonData JSONDataSet) Set(fileName string) error {
 		err = errors.New("can't save")
 		logger.PrintLog(logger.ERROR, "Setter. Save new content: "+string(content)+". Error: "+err.Error())
 	}
-	//}
-	//}
-	//}
 	return err
 }
 

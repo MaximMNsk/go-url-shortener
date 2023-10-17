@@ -92,12 +92,9 @@ func parseEnv() {
 
 func HandleConfig() error {
 
+	setDefaults()
 	parseEnv()
 	parseFlags()
-	setDefaults()
-
-	fmt.Println(Config.Flag)
-	fmt.Println(Config.Env)
 
 	if Config.Env.AppAddr != "" {
 		Config.Final.AppAddr = Config.Env.AppAddr
