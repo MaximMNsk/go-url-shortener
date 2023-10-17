@@ -2,7 +2,7 @@ package files
 
 import (
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -50,7 +50,7 @@ func restoreFile(source, dest string) error {
 }
 
 func TestJSONDataSet_Set(t *testing.T) {
-	_ = config.HandleConfig()
+	_ = confModule.HandleConfig()
 
 	type fields struct {
 		Link      string
@@ -72,7 +72,7 @@ func TestJSONDataSet_Set(t *testing.T) {
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
 			},
-			args: args{fileName: config.Config.Default.LinkFile},
+			args: args{fileName: filepath.Join(confModule.Config.Default.LinkFile)},
 		},
 	}
 	for _, tt := range tests {
@@ -111,7 +111,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 				Link: "TestLink",
 			},
 			args: args{
-				fileName: config.Config.Default.LinkFile,
+				fileName: filepath.Join(confModule.Config.Default.LinkFile),
 				//sourceFileName: "./test_source.json",
 			},
 			want: want(JSONData{

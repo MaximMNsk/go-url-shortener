@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
+	"github.com/MaximMNsk/go-url-shortener/internal/models/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
@@ -54,8 +55,17 @@ func load(i JSONData, storage string) (JSONData, error) {
 		err := linkData.Get()
 		return JSONData(linkData), err
 	}
-	if (storage == "files") || (storage == "memory") {
+	if storage == "files" {
 		linkData := files.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Get()
+		return JSONData(linkData), err
+	}
+	if storage == "memory" {
+		linkData := memory.JSONData{
 			ID:        i.ID,
 			Link:      i.Link,
 			ShortLink: i.ShortLink,
@@ -76,8 +86,17 @@ func store(i JSONData, storage string) error {
 		err := linkData.Set()
 		return err
 	}
-	if (storage == "files") || (storage == "memory") {
+	if storage == "files" {
 		linkData := files.JSONData{
+			ID:        i.ID,
+			Link:      i.Link,
+			ShortLink: i.ShortLink,
+		}
+		err := linkData.Set()
+		return err
+	}
+	if storage == "memory" {
+		linkData := memory.JSONData{
 			ID:        i.ID,
 			Link:      i.Link,
 			ShortLink: i.ShortLink,
