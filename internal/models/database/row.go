@@ -25,16 +25,15 @@ const createTableQuery = `
 CREATE TABLE IF NOT EXISTS shortener.short_links 
 	(
 	    id serial primary key,
-	    correlation_id text,
 	    original_url text,
 	    short_url text,
-	    uid varchar(10)
+	    uid text
 	)`
 
 const insertLinkRow = `insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
-const insertLinkRowBatch = `insert into shortener.short_links (original_url, short_url, uid, correlation_id) values ($1, $2, $3, $4)`
+const insertLinkRowBatch = `insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
 
-const selectRow = `select uid, original_url, short_url, correlation_id from shortener.short_links where uid = $1 or original_url = $2 or correlation_id = $3`
+const selectRow = `select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -66,8 +65,8 @@ func getData(data JSONData) (JSONData, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link, data.CorrelationID)
-	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.CorrelationID)
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
+	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
@@ -129,7 +128,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	for i, v := range savingData {
 		linkID := sha1hash.Create(v.Link, 8)
 		savingData[i].ID = linkID
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
 		savingData[i].CorrelationID = v.CorrelationID
 		savingData[i].Link = v.Link
 	}
@@ -142,7 +141,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, v.CorrelationID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.CorrelationID)
 	}
 	br := connection.SendBatch(db.GetCtx(), &batch)
 	_, err = br.Exec()

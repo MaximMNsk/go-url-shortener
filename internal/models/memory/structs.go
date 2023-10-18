@@ -21,7 +21,7 @@ var storage []JSONData
 func (jsonData *JSONData) Get() error {
 	logger.PrintLog(logger.INFO, "Get from memory")
 	for _, v := range storage {
-		if v.ID == jsonData.ID || v.Link == jsonData.Link || v.CorrelationID == jsonData.ID {
+		if v.ID == jsonData.ID || v.Link == jsonData.Link {
 			jsonData.ID = v.ID
 			jsonData.Link = v.Link
 			jsonData.ShortLink = v.ShortLink
@@ -63,7 +63,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	for i, v := range savingData {
 		savingData[i].ID = sha1hash.Create(v.Link, 8)
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, savingData[i].ID)
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
 	}
 
 	///////// Current logic

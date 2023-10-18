@@ -3,7 +3,6 @@ package files
 import (
 	"encoding/json"
 	"errors"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
@@ -29,7 +28,7 @@ func (jsonData *JSONData) Get() error {
 		err = json.Unmarshal([]byte(jsonString), &savedData)
 		if err == nil {
 			for _, v := range savedData {
-				if v.ID == jsonData.ID || v.Link == jsonData.Link || v.CorrelationID == jsonData.ID {
+				if v.ID == jsonData.ID || v.Link == jsonData.Link {
 					jsonData.ID = v.ID
 					jsonData.Link = v.Link
 					jsonData.ShortLink = v.ShortLink
@@ -156,8 +155,8 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	}
 
 	for i, v := range savingData {
-		savingData[i].ID = sha1hash.Create(v.Link, 8)
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, savingData[i].ID)
+		savingData[i].ID = v.CorrelationID
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
 	}
 
 	///////// Current logic
