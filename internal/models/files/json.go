@@ -155,8 +155,8 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 		return []byte(""), err
 	}
 
-	for i, _ := range savingData {
-		savingData[i].ID = sha1hash.Create(savingData[i].Link, 8)
+	for i, v := range savingData {
+		savingData[i].ID = sha1hash.Create(v.Link, 8)
 		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, savingData[i].ID)
 	}
 

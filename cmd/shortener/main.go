@@ -235,7 +235,7 @@ func handleAPIBatch(res http.ResponseWriter, req *http.Request) {
 			Place:     "body",
 			InnerData: string(batchResp),
 		}
-		httpResp.Created(res, additional)
+		httpResp.CreatedJSON(res, additional)
 	}
 
 	if Storage == "files" {
@@ -252,7 +252,7 @@ func handleAPIBatch(res http.ResponseWriter, req *http.Request) {
 			Place:     "body",
 			InnerData: string(batchResp),
 		}
-		httpResp.Created(res, additional)
+		httpResp.CreatedJSON(res, additional)
 	}
 
 	if Storage == "memory" {
@@ -269,7 +269,7 @@ func handleAPIBatch(res http.ResponseWriter, req *http.Request) {
 			Place:     "body",
 			InnerData: string(batchResp),
 		}
-		httpResp.Created(res, additional)
+		httpResp.CreatedJSON(res, additional)
 	}
 }
 
