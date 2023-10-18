@@ -116,6 +116,7 @@ func handleGET(res http.ResponseWriter, req *http.Request) {
 	requestID := req.URL.Path[1:]
 	linkData := JSONData{}
 	linkData.ID = requestID
+	linkData.CorrelationID = requestID
 	linkData, err := load(linkData, Storage, &mx)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())

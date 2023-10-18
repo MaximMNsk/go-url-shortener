@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS shortener.short_links
 const insertLinkRow = `insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
 const insertLinkRowBatch = `insert into shortener.short_links (original_url, short_url, uid, correlation_id) values ($1, $2, $3, $4)`
 
-const selectRow = `select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
+const selectRow = `select uid, original_url, short_url, correlation_id from shortener.short_links where uid = $1 or original_url = $2 or correlation_id = $3`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -66,8 +66,8 @@ func getData(data JSONData) (JSONData, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
-	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link, data.CorrelationID)
+	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.CorrelationID)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}

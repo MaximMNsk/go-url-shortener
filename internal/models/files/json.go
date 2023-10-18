@@ -29,7 +29,7 @@ func (jsonData *JSONData) Get() error {
 		err = json.Unmarshal([]byte(jsonString), &savedData)
 		if err == nil {
 			for _, v := range savedData {
-				if v.ID == jsonData.ID || v.Link == jsonData.Link {
+				if v.ID == jsonData.ID || v.Link == jsonData.Link || v.CorrelationID == jsonData.ID {
 					jsonData.ID = v.ID
 					jsonData.Link = v.Link
 					jsonData.ShortLink = v.ShortLink
