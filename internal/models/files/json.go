@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type JSONData struct {
-	Link      string
-	ShortLink string
-	ID        string
+	Link          string `json:"original_url"`
+	ShortLink     string
+	ID            string
+	CorrelationID string `json:"correlation_id"`
 }
-
-//type JSONDataSet JSONDataGet
 
 func (jsonData *JSONData) Get() error {
 	fileName := confModule.Config.Final.LinkFile
@@ -135,4 +137,62 @@ func saveData(data []byte, fileName string) bool {
 	} else {
 		return true
 	}
+}
+
+type BatchStruct struct {
+	MX      sync.Mutex
+	Content []byte
+}
+
+func HandleBatch(batchData *BatchStruct) ([]byte, error) {
+
+	batchData.MX.Lock()
+	defer batchData.MX.Unlock()
+
+	var savingData []JSONData
+	err := json.Unmarshal(batchData.Content, &savingData)
+	if err != nil {
+		return []byte(""), err
+	}
+
+	for i, _ := range savingData {
+		linkID := rand.RandStringBytes(8)
+		savingData[i].ID = linkID
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+	}
+
+	///////// Current logic
+	var savedData []JSONData
+
+	fileName := confModule.Config.Final.LinkFile
+	jsonString, err := getData(fileName)
+	if err != nil {
+		jsonString = ""
+	} else {
+		err = json.Unmarshal([]byte(jsonString), &savedData)
+		if err != nil {
+			return []byte(""), err
+		}
+	}
+
+	toSave := append(savedData, savingData...)
+	var content []byte
+	content, err = json.Marshal(toSave)
+	if err != nil {
+		return []byte(""), err
+	}
+
+	isOk := saveData(content, fileName)
+	if !isOk {
+		err = errors.New("can't save")
+		return []byte(""), err
+	}
+	//////// End logic
+
+	JSONResp, err := json.Marshal(savingData)
+	if err != nil {
+		logger.PrintLog(logger.WARN, err.Error())
+	}
+
+	return JSONResp, nil
 }
