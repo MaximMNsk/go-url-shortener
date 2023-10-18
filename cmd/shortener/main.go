@@ -7,8 +7,8 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
@@ -155,9 +155,9 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Пришел урл
-	linkID := rand.RandStringBytes(8)
 	linkData := JSONData{}
 	linkData.Link = string(contentBody)
+	linkID := sha1hash.Create(linkData.Link, 8)
 	linkData, err := load(linkData, Storage, &mx)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
@@ -292,8 +292,6 @@ func handleAPIShorten(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Пришел урл
-	linkID := rand.RandStringBytes(8)
-	//linkData := storage.JSONData{}
 	var apiData input
 	err := json.Unmarshal(contentBody, &apiData)
 	if err != nil {
@@ -302,6 +300,7 @@ func handleAPIShorten(res http.ResponseWriter, req *http.Request) {
 	}
 	linkData := JSONData{}
 	linkData.Link = apiData.URL
+	linkID := sha1hash.Create(linkData.Link, 8)
 	linkData, err = load(linkData, Storage, &mx)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
@@ -399,6 +398,7 @@ func main() {
 		With(handleOther)
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
+		r.Post(`/api/shorten/{query}`, handleAPI)
 		r.Post(`/api/{query}`, handleAPI)
 		r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)

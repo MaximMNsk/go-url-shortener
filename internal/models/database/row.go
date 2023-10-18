@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
@@ -130,7 +130,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	}
 
 	for i, v := range savingData {
-		linkID := rand.RandStringBytes(8)
+		linkID := sha1hash.Create(v.Link, 8)
 		fmt.Println(savingData[i])
 		savingData[i].ID = linkID
 		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)

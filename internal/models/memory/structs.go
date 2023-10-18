@@ -2,8 +2,8 @@ package memory
 
 import (
 	"encoding/json"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"sync"
@@ -62,9 +62,8 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	}
 
 	for i, _ := range savingData {
-		linkID := rand.RandStringBytes(8)
-		savingData[i].ID = linkID
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+		savingData[i].ID = sha1hash.Create(savingData[i].Link, 8)
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, savingData[i].ID)
 	}
 
 	///////// Current logic
