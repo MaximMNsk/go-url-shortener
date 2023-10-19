@@ -14,7 +14,7 @@ import (
 
 type JSONData struct {
 	Link          string `json:"original_url"`
-	ShortLink     string
+	ShortLink     string `json:"short_url"`
 	ID            string
 	CorrelationID string `json:"correlation_id"`
 }

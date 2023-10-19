@@ -15,7 +15,7 @@ import (
 
 type JSONData struct {
 	Link          string `json:"original_url"`
-	ShortLink     string
+	ShortLink     string `json:"short_url"`
 	ID            string
 	CorrelationID string `json:"correlation_id"`
 }
@@ -153,7 +153,6 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 		return []byte(""), err
 	}
 	//////// End logic
-
 	JSONResp, err := json.Marshal(savingData)
 	if err != nil {
 		logger.PrintLog(logger.WARN, err.Error())
