@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -159,31 +160,28 @@ func handlePOST(res http.ResponseWriter, req *http.Request) {
 	linkData := JSONData{}
 	linkData.Link = string(contentBody)
 	linkID := sha1hash.Create(linkData.Link, 8)
-	linkData, err := load(linkData, Storage, &mx)
-	if err != nil {
-		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
-	}
-	shortLink := linkData.ShortLink
-	// Если нет, генерим ид, сохраняем
-	if linkData.ID == "" {
-		linkData.Link = string(contentBody)
-		linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-		linkData.ID = linkID
-		//err := linkDataSet.Set()
-		err := store(linkData, Storage, &mx)
-		if err != nil {
-			logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
-			httpResp.InternalError(res)
-			return
-		}
-		shortLink = linkData.ShortLink
-	}
-	// Отдаем 201 ответ с шортлинком
+
+	linkData.Link = string(contentBody)
+	linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+	linkData.ID = linkID
 
 	additional := httpResp.Additional{
 		Place:     "body",
-		InnerData: shortLink,
+		InnerData: linkData.ShortLink,
 	}
+
+	err := store(linkData, Storage, &mx)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
+		if strings.Contains(err.Error(), `SQLSTATE 23505`) {
+			httpResp.Conflict(res, additional)
+			return
+		}
+		httpResp.InternalError(res)
+		return
+	}
+
+	// Отдаем 201 ответ с шортлинком
 	httpResp.Created(res, additional)
 }
 
@@ -228,9 +226,11 @@ func handleAPIBatch(res http.ResponseWriter, req *http.Request) {
 		}
 		batchResp, err := database.HandleBatch(&batchData)
 		if err != nil {
-			logger.PrintLog(logger.ERROR, err.Error())
-			httpResp.InternalError(res)
-			return
+			if !strings.Contains(err.Error(), `SQLSTATE 23505`) {
+				logger.PrintLog(logger.ERROR, err.Error())
+				httpResp.InternalError(res)
+				return
+			}
 		}
 		additional := httpResp.Additional{
 			Place:     "body",
@@ -300,38 +300,35 @@ func handleAPIShorten(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	linkData := JSONData{}
-	linkData.Link = apiData.URL
 	linkID := sha1hash.Create(linkData.Link, 8)
-	linkData, err = load(linkData, Storage, &mx)
-	if err != nil {
-		logger.PrintLog(logger.WARN, "File exception: "+err.Error())
-	}
-	shortLink := linkData.ShortLink
-	// Если нет, генерим ид, сохраняем
-	if linkData.ID == "" {
-		linkData.Link = apiData.URL
-		linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
-		linkData.ID = linkID
-		err := store(linkData, Storage, &mx)
-		if err != nil {
-			httpResp.InternalError(res)
-			return
-		}
-		shortLink = linkData.ShortLink
-	}
+	linkData.Link = apiData.URL
+	linkData.ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+	linkData.ID = linkID
+
 	var resp output
-	resp.Result = shortLink
+	resp.Result = linkData.ShortLink
 	var JSONResp []byte
 	JSONResp, err = json.Marshal(resp)
 	if err != nil {
 		httpResp.InternalError(res)
 		return
 	}
-	// Отдаем 201 ответ с шортлинком
 	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: string(JSONResp),
 	}
+
+	err = store(linkData, Storage, &mx)
+	if err != nil {
+		if strings.Contains(err.Error(), `SQLSTATE 23505`) {
+			httpResp.ConflictJSON(res, additional)
+			return
+		}
+		httpResp.InternalError(res)
+		return
+	}
+
+	// Отдаем 201 ответ с шортлинком
 	httpResp.CreatedJSON(res, additional)
 }
 

@@ -45,6 +45,10 @@ func Created(w http.ResponseWriter, addData Additional) {
 	successAnswer(w, http.StatusCreated, addData)
 }
 
+func Conflict(w http.ResponseWriter, addData Additional) {
+	successAnswer(w, http.StatusConflict, addData)
+}
+
 func successAnswerJSON(w http.ResponseWriter, status int, additionalData Additional) {
 	w.Header().Add("Content-Type", "application/json")
 	if additionalData.Place == "header" {
@@ -58,4 +62,8 @@ func successAnswerJSON(w http.ResponseWriter, status int, additionalData Additio
 
 func CreatedJSON(w http.ResponseWriter, addData Additional) {
 	successAnswerJSON(w, http.StatusCreated, addData)
+}
+
+func ConflictJSON(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusConflict, addData)
 }
