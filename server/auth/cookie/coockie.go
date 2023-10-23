@@ -3,6 +3,7 @@ package cookie
 import (
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/golang-jwt/jwt/v4"
 	"net/http"
@@ -10,32 +11,49 @@ import (
 	"time"
 )
 
+var UserID int
+
+func StrongAuthHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := r.Cookie("token")
+		if err != nil && strings.Contains(err.Error(), `not present`) {
+			additional := httpResp.Additional{}
+			httpResp.Unauthorized(w, additional)
+			return
+		}
+
+		remoteUserID := GetUserID(token.Value)
+
+		if remoteUserID > 0 {
+			next.ServeHTTP(w, r)
+			return
+		}
+		additional := httpResp.Additional{}
+		httpResp.Unauthorized(w, additional)
+	})
+}
+
 func AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		/** TODO
-		 *  Get cookie
-		 *  If cookie not set - set cookie
-		 *  Decrypt data from cookie
-		 *  If cookie not contain UserID - Unautorized answer
-		 *  Else - serve
-		 */
 		token, err := r.Cookie("token")
 		if err != nil && strings.Contains(err.Error(), `not present`) {
 			logger.PrintLog(logger.WARN, err.Error())
-			userID := 10
-			newToken, err := BuildJWTString(userID)
+			UserID, err = randomizer.RandDigitalBytes(3)
+			if err != nil {
+				logger.PrintLog(logger.WARN, err.Error())
+			}
+			newToken, err := BuildJWTString(UserID)
 			if err != nil {
 				logger.PrintLog(logger.WARN, err.Error())
 			}
 			cookie := &http.Cookie{
 				Name:    `token`,
 				Value:   newToken,
-				Expires: time.Now().Add(TOKEN_EXP),
+				Expires: time.Now().Add(TokenExp),
 				Path:    `/`,
 			}
 			http.SetCookie(w, cookie)
-			additional := httpResp.Additional{}
-			httpResp.Unauthorized(w, additional)
+			next.ServeHTTP(w, r)
 			return
 			//fmt.Println(&cookie)
 		}
@@ -63,8 +81,8 @@ type Claims struct {
 	UserID int
 }
 
-const TOKEN_EXP = time.Hour * 3
-const SECRET_KEY = "supersecretkey"
+const TokenExp = time.Hour * 3
+const SecretKey = "superPuperSecretKey"
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.
 func BuildJWTString(userID int) (string, error) {
@@ -72,14 +90,14 @@ func BuildJWTString(userID int) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			// когда создан токен
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TOKEN_EXP)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExp)),
 		},
 		// собственное утверждение
-		UserID: 1,
+		UserID: userID,
 	})
 
 	// создаём строку токена
-	tokenString, err := token.SignedString([]byte(SECRET_KEY))
+	tokenString, err := token.SignedString([]byte(SecretKey))
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +113,7 @@ func GetUserID(tokenString string) int {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return []byte(SECRET_KEY), nil
+		return []byte(SecretKey), nil
 	})
 
 	if err != nil {

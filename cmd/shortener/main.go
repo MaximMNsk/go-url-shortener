@@ -467,16 +467,18 @@ func main() {
 		With(handleOther)
 
 	r.Route("/", func(r chi.Router) {
+		r.Use(cookie.AuthHandler)
 		r.Post(`/`, handlePOST)
 		r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)
 	})
 
 	r.Route("/api", func(r chi.Router) {
+		r.Use(cookie.StrongAuthHandler)
 		r.Post(`/shorten/{query}`, handleAPI)
 		r.Post(`/{query}`, handleAPI)
 		r.Get(`/user/{query}`, handleAPI)
-	}).With(cookie.AuthHandler)
+	})
 
 	logger.PrintLog(logger.INFO, "Starting server")
 	err = http.ListenAndServe(confModule.Config.Final.AppAddr, r)

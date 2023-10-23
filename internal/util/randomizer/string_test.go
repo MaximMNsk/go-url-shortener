@@ -1,4 +1,4 @@
-package rand
+package randomizer
 
 import (
 	"github.com/stretchr/testify/require"

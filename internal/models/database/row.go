@@ -7,6 +7,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
 	"sync"
@@ -29,7 +30,8 @@ CREATE TABLE IF NOT EXISTS shortener.short_links
 	    id serial primary key,
 	    original_url text,
 	    short_url text,
-	    uid text
+	    uid text,
+	    user_id int
 	)`
 
 const createIndexQuery = `
@@ -37,17 +39,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_original_url
 ON shortener.short_links(original_url)`
 
 const insertLinkRow = `
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const insertLinkRowBatch = `
 
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
+select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) --and user_id = $3`
 
 const selectAllRows = `
-select original_url, short_url from shortener.short_links`
+select original_url, short_url from shortener.short_links where user_id = $1`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -85,7 +87,7 @@ func getData(data JSONData) (JSONData, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link /*, cookie.UserID*/)
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
@@ -111,7 +113,7 @@ func saveData(data JSONData) (JSONData, error) {
 		return JSONData{}, errors.New("connection to DB not found")
 	}
 
-	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID)
+	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, cookie.UserID)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Insert attention: "+err.Error())
 		return data, err
@@ -152,7 +154,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.CorrelationID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.CorrelationID, cookie.UserID)
 	}
 	br := connection.SendBatch(db.GetCtx(), &batch)
 	defer br.Close()
@@ -186,7 +188,7 @@ func HandleUserUrls() ([]byte, error) {
 	if connection == nil {
 		return nil, errors.New("connection to DB not found")
 	}
-	rows, err := connection.Query(ctx, selectAllRows)
+	rows, err := connection.Query(ctx, selectAllRows, cookie.UserID)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
