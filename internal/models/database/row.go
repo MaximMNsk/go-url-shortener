@@ -87,7 +87,7 @@ func getData(data JSONData) (JSONData, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link /*, cookie.UserID*/)
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())

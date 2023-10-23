@@ -474,9 +474,6 @@ func main() {
 		r.Post(`/api/shorten/{query}`, handleAPI)
 		r.Post(`/api/{query}`, handleAPI)
 		r.Get(`/api/user/{query}`, handleAPI)
-		//r.Group(func(r chi.Router) {
-		//	r.Use(cookie.StrongAuthHandler)
-		//})
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")

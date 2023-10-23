@@ -13,32 +13,14 @@ import (
 
 var UserID int
 
-func StrongAuthHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := r.Cookie("token")
-		if err != nil && strings.Contains(err.Error(), `not present`) {
-			additional := httpResp.Additional{}
-			httpResp.Unauthorized(w, additional)
-			return
-		}
-
-		remoteUserID := GetUserID(token.Value)
-
-		if remoteUserID > 0 {
-			next.ServeHTTP(w, r)
-			return
-		}
-		additional := httpResp.Additional{}
-		httpResp.Unauthorized(w, additional)
-	})
-}
-
 func AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := r.Cookie("token")
 		if err != nil && strings.Contains(err.Error(), `not present`) {
 			logger.PrintLog(logger.WARN, err.Error())
 			UserID, err = randomizer.RandDigitalBytes(3)
+			logInfo := fmt.Sprintf("Set userID: %d", UserID)
+			logger.PrintLog(logger.INFO, logInfo)
 			if err != nil {
 				logger.PrintLog(logger.WARN, err.Error())
 			}
@@ -46,6 +28,7 @@ func AuthHandler(next http.Handler) http.Handler {
 			if err != nil {
 				logger.PrintLog(logger.WARN, err.Error())
 			}
+			logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
 			cookie := &http.Cookie{
 				Name:    `token`,
 				Value:   newToken,
@@ -55,17 +38,12 @@ func AuthHandler(next http.Handler) http.Handler {
 			http.SetCookie(w, cookie)
 			next.ServeHTTP(w, r)
 			return
-			//fmt.Println(&cookie)
 		}
 
-		//token, err = r.Cookie(`token`)
-		//if err != nil {
-		//	fmt.Println(err.Error())
-		//}
 		logger.PrintLog(logger.INFO, "Token: "+token.Value)
-		remoteUserID := GetUserID(token.Value)
+		UserID := GetUserID(token.Value)
 
-		if remoteUserID > 0 {
+		if UserID > 0 {
 			next.ServeHTTP(w, r)
 			return
 		}
