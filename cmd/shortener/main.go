@@ -466,18 +466,17 @@ func main() {
 		With(compress.GzipHandler).
 		With(handleOther)
 
-	r.Route("/", func(r chi.Router) {
+	r.Route(`/`, func(r chi.Router) {
 		r.Use(cookie.AuthHandler)
 		r.Post(`/`, handlePOST)
 		r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)
-	})
-
-	r.Route("/api", func(r chi.Router) {
-		r.Use(cookie.StrongAuthHandler)
-		r.Post(`/shorten/{query}`, handleAPI)
-		r.Post(`/{query}`, handleAPI)
-		r.Get(`/user/{query}`, handleAPI)
+		r.Post(`/api/shorten/{query}`, handleAPI)
+		r.Post(`/api/{query}`, handleAPI)
+		r.Group(func(r chi.Router) {
+			r.Use(cookie.StrongAuthHandler)
+			r.Get(`/api/user/{query}`, handleAPI)
+		})
 	})
 
 	logger.PrintLog(logger.INFO, "Starting server")

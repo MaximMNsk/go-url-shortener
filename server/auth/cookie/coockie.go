@@ -58,11 +58,11 @@ func AuthHandler(next http.Handler) http.Handler {
 			//fmt.Println(&cookie)
 		}
 
-		token, err = r.Cookie(`token`)
-		if err != nil {
-			fmt.Println(err.Error())
-		}
-		fmt.Println(token)
+		//token, err = r.Cookie(`token`)
+		//if err != nil {
+		//	fmt.Println(err.Error())
+		//}
+		logger.PrintLog(logger.INFO, "Token: "+token.Value)
 		remoteUserID := GetUserID(token.Value)
 
 		if remoteUserID > 0 {
