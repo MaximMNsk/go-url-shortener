@@ -77,3 +77,23 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	return JSONResp, nil
 }
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func HandleUserUrls() ([]byte, error) {
+	if len(storage) > 0 {
+		var resp JSONCutted
+		var batchResp []JSONCutted
+		for _, v := range storage {
+			resp.Link = v.Link
+			resp.ShortLink = v.ShortLink
+			batchResp = append(batchResp, resp)
+		}
+		JSONResp, err := json.Marshal(batchResp)
+		return JSONResp, err
+	}
+	return nil, nil
+}

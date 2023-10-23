@@ -67,3 +67,15 @@ func CreatedJSON(w http.ResponseWriter, addData Additional) {
 func ConflictJSON(w http.ResponseWriter, addData Additional) {
 	successAnswerJSON(w, http.StatusConflict, addData)
 }
+
+func OkAdditionalJSON(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusOK, addData)
+}
+
+func NoContent(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusNoContent, addData)
+}
+
+func Unauthorized(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusUnauthorized, addData)
+}

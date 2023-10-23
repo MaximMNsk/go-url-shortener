@@ -46,6 +46,9 @@ insert into shortener.short_links (original_url, short_url, uid) values ($1, $2,
 const selectRow = `
 select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
 
+const selectAllRows = `
+select original_url, short_url from shortener.short_links`
+
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
 	if err != nil {
@@ -169,4 +172,33 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	}
 
 	return JSONResp, nil
+}
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func HandleUserUrls() ([]byte, error) {
+	var batchResp []JSONCutted
+	ctx := context.Background()
+	connection := db.GetDB()
+	if connection == nil {
+		return nil, errors.New("connection to DB not found")
+	}
+	rows, err := connection.Query(ctx, selectAllRows)
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
+	}
+	for rows.Next() {
+		var selected JSONCutted
+		_ = rows.Scan(&selected.Link, &selected.ShortLink)
+		batchResp = append(batchResp, selected)
+	}
+	if len(batchResp) > 0 {
+		JSONResp, err := json.Marshal(batchResp)
+		return JSONResp, err
+	}
+
+	return nil, nil
 }

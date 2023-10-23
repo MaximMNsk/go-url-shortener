@@ -194,3 +194,33 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	return JSONResp, nil
 }
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func HandleUserUrls() ([]byte, error) {
+	var savedData []JSONCutted
+
+	fileName := confModule.Config.Final.LinkFile
+	jsonString, err := getData(fileName)
+	if err != nil {
+		jsonString = ""
+	} else {
+		err = json.Unmarshal([]byte(jsonString), &savedData)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if len(savedData) > 0 {
+		var content []byte
+		content, err = json.Marshal(savedData)
+		if err != nil {
+			return nil, err
+		}
+		return content, nil
+	}
+	return nil, nil
+}

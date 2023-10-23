@@ -10,6 +10,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
@@ -194,6 +195,7 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 	availableCurls := make(controllers)
 	availableCurls["shorten"] = true
 	availableCurls["batch"] = true
+	availableCurls["urls"] = true
 
 	if !availableCurls[ctrl] {
 		httpResp.BadRequest(res)
@@ -207,6 +209,75 @@ func handleAPI(res http.ResponseWriter, req *http.Request) {
 
 	if ctrl == "batch" {
 		handleAPIBatch(res, req)
+		return
+	}
+
+	if ctrl == "urls" {
+		handleAPIUserUrls(res, req)
+		return
+	}
+}
+
+func handleAPIUserUrls(res http.ResponseWriter, req *http.Request) {
+	if Storage == "database" {
+		batchResp, err := database.HandleUserUrls()
+		if err != nil {
+			logger.PrintLog(logger.ERROR, err.Error())
+			httpResp.InternalError(res)
+			return
+		}
+		if batchResp == nil {
+			logger.PrintLog(logger.INFO, "Can't find any...")
+			additional := httpResp.Additional{}
+			httpResp.NoContent(res, additional)
+			return
+		}
+		additional := httpResp.Additional{
+			Place:     "body",
+			InnerData: string(batchResp),
+		}
+		httpResp.OkAdditionalJSON(res, additional)
+		return
+	}
+	if Storage == "files" {
+		batchResp, err := files.HandleUserUrls()
+		if err != nil {
+			logger.PrintLog(logger.ERROR, err.Error())
+			httpResp.InternalError(res)
+			return
+		}
+		if batchResp == nil {
+			logger.PrintLog(logger.INFO, "Can't find any...")
+			additional := httpResp.Additional{}
+			httpResp.NoContent(res, additional)
+			return
+		}
+		additional := httpResp.Additional{
+			Place:     "body",
+			InnerData: string(batchResp),
+		}
+		httpResp.OkAdditionalJSON(res, additional)
+		return
+
+	}
+	if Storage == "memory" {
+		batchResp, err := memory.HandleUserUrls()
+		if err != nil {
+			logger.PrintLog(logger.ERROR, err.Error())
+			httpResp.InternalError(res)
+			return
+		}
+		if batchResp == nil {
+			logger.PrintLog(logger.INFO, "Can't find any...")
+			additional := httpResp.Additional{}
+			httpResp.NoContent(res, additional)
+			return
+		}
+		additional := httpResp.Additional{
+			Place:     "body",
+			InnerData: string(batchResp),
+		}
+		httpResp.OkAdditionalJSON(res, additional)
 		return
 	}
 }
@@ -394,13 +465,18 @@ func main() {
 		With(extlogger.Log).
 		With(compress.GzipHandler).
 		With(handleOther)
+
 	r.Route("/", func(r chi.Router) {
 		r.Post(`/`, handlePOST)
-		r.Post(`/api/shorten/{query}`, handleAPI)
-		r.Post(`/api/{query}`, handleAPI)
 		r.Get(`/ping`, handlePing)
 		r.Get(`/{query}`, handleGET)
 	})
+
+	r.Route("/api", func(r chi.Router) {
+		r.Post(`/shorten/{query}`, handleAPI)
+		r.Post(`/{query}`, handleAPI)
+		r.Get(`/user/{query}`, handleAPI)
+	}).With(cookie.AuthHandler)
 
 	logger.PrintLog(logger.INFO, "Starting server")
 	err = http.ListenAndServe(confModule.Config.Final.AppAddr, r)
