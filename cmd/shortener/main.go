@@ -268,17 +268,13 @@ func handleOther(next http.Handler) http.Handler {
  */
 func initStorage(data *InputData) model.Storable {
 	var storage model.Storable
-	storage = &memory.MemStorage{
-		ID:        data.ID,
-		Link:      data.Link,
-		ShortLink: data.ShortLink,
-	}
 	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
 		storage = &database.DBStorage{
 			ID:        data.ID,
 			Link:      data.Link,
 			ShortLink: data.ShortLink,
 		}
+		return storage
 	}
 	if confModule.Config.Env.LinkFile != "" || confModule.Config.Flag.LinkFile != "" {
 		storage = &files.FileStorage{
@@ -286,6 +282,12 @@ func initStorage(data *InputData) model.Storable {
 			Link:      data.Link,
 			ShortLink: data.ShortLink,
 		}
+		return storage
+	}
+	storage = &memory.MemStorage{
+		ID:        data.ID,
+		Link:      data.Link,
+		ShortLink: data.ShortLink,
 	}
 	return storage
 }

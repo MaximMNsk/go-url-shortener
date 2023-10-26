@@ -77,7 +77,7 @@ func TestJSONDataSet_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData := &JSONData{
+			jsonData := &FileStorage{
 				Link:      tt.fields.Link,
 				ShortLink: tt.fields.ShortLink,
 				ID:        tt.fields.ID,
@@ -94,7 +94,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 		ShortLink string
 		ID        string
 	}
-	type want JSONData
+	type want FileStorage
 	type args struct {
 		fileName       string
 		sourceFileName string
@@ -114,7 +114,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 				fileName: filepath.Join(confModule.Config.Default.LinkFile),
 				//sourceFileName: "./test_source.json",
 			},
-			want: want(JSONData{
+			want: want(FileStorage{
 				Link:      "TestLink",
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
@@ -124,13 +124,13 @@ func TestJSONDataGet_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			jsonData := JSONData{
+			jsonData := FileStorage{
 				Link:      tt.fields.Link,
 				ShortLink: tt.fields.ShortLink,
 				ID:        tt.fields.ID,
 			}
-			_ = jsonData.Get()
-			assert.EqualValues(t, tt.want, jsonData)
+			link, _ := jsonData.Get()
+			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}
 }
