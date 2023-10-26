@@ -274,6 +274,8 @@ func initStorage(data *InputData) model.Storable {
 			Link:      data.Link,
 			ShortLink: data.ShortLink,
 		}
+		logger.PrintLog(logger.DEBUG, `Config.Env.DB: `+confModule.Config.Env.DB)
+		logger.PrintLog(logger.DEBUG, `Config.Flag.DB: `+confModule.Config.Flag.DB)
 		return storage
 	}
 	if confModule.Config.Env.LinkFile != "" || confModule.Config.Flag.LinkFile != "" {
