@@ -2,73 +2,58 @@ package memory
 
 import (
 	"encoding/json"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
+	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
-	"sync"
 )
 
-type JSONData struct {
-	Link          string `json:"original_url"`
-	ShortLink     string `json:"short_url"`
-	ID            string
-	CorrelationID string `json:"correlation_id"`
+type MemStorage struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+	ID        string `json:"correlation_id"`
 }
 
-var storage []JSONData
+var storage = make(map[string]MemStorage)
 
-func (jsonData *JSONData) Get() error {
+func (jsonData *MemStorage) Get() (string, error) {
 	logger.PrintLog(logger.INFO, "Get from memory")
 	for _, v := range storage {
 		if v.ID == jsonData.ID || v.Link == jsonData.Link {
-			jsonData.ID = v.ID
-			jsonData.Link = v.Link
-			jsonData.ShortLink = v.ShortLink
-			jsonData.CorrelationID = v.CorrelationID
+			return v.Link, nil
 		}
 	}
-	return nil
+	return "", errors.New("data not found")
 }
 
-func (jsonData *JSONData) Set() error {
+func (jsonData *MemStorage) Set() error {
 	logger.PrintLog(logger.INFO, "Set to memory")
+
 	for _, v := range storage {
 		if v.Link == jsonData.Link {
 			return nil
 		}
 	}
 
-	storage = append(storage, *jsonData)
+	storage[jsonData.ID] = *jsonData
 
 	return nil
 }
 
-type BatchStruct struct {
-	MX      sync.Mutex
-	Content []byte
-}
+func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 
-func HandleBatch(batchData *BatchStruct) ([]byte, error) {
+	var savingData []MemStorage
 
-	batchData.MX.Lock()
-	defer batchData.MX.Unlock()
-
-	var savingData []JSONData
-
-	err := json.Unmarshal(batchData.Content, &savingData)
+	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
-		return []byte(""), err
+		return nil, err
 	}
 
 	for i, v := range savingData {
-		savingData[i].ID = sha1hash.Create(v.Link, 8)
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
+		//savingData[i].ID = sha1hash.Create(v.Link, 8)
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
+		storage[savingData[i].ID] = savingData[i]
 	}
-
-	///////// Current logic
-	storage = append(storage, savingData...)
-	//////// End logic
 
 	JSONResp, err := json.Marshal(savingData)
 	if err != nil {

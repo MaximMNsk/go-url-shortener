@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
@@ -9,14 +8,13 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
-	"sync"
+	"strings"
 )
 
-type JSONData struct {
-	Link          string `json:"original_url"`
-	ShortLink     string `json:"short_url"`
-	ID            string
-	CorrelationID string `json:"correlation_id"`
+type DBStorage struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+	ID        string `json:"correlation_id"`
 }
 
 const createSchemaQuery = `
@@ -66,19 +64,16 @@ func PrepareDB(connect *pgx.Conn) {
 	}
 }
 
-func (jsonData *JSONData) Get() error {
+func (jsonData *DBStorage) Get() (string, error) {
 	logger.PrintLog(logger.INFO, "Get from database")
 	row, err := getData(*jsonData)
-	jsonData.ID = row.ID
-	jsonData.Link = row.Link
-	jsonData.ShortLink = row.ShortLink
-	return err
+	return row.Link, err
 }
 
-func getData(data JSONData) (JSONData, error) {
-	ctx := context.Background()
+func getData(data DBStorage) (DBStorage, error) {
+	ctx := db.GetCtx()
 	connection := db.GetDB()
-	selected := JSONData{}
+	selected := DBStorage{}
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
@@ -90,7 +85,7 @@ func getData(data JSONData) (JSONData, error) {
 	return selected, nil
 }
 
-func (jsonData *JSONData) Set() error {
+func (jsonData *DBStorage) Set() error {
 	logger.PrintLog(logger.INFO, "Set to database")
 
 	var err error
@@ -101,11 +96,11 @@ func (jsonData *JSONData) Set() error {
 	return err
 }
 
-func saveData(data JSONData) (JSONData, error) {
-	ctx := context.Background()
+func saveData(data DBStorage) (DBStorage, error) {
+	ctx := db.GetCtx()
 	connection := db.GetDB()
 	if connection == nil {
-		return JSONData{}, errors.New("connection to DB not found")
+		return DBStorage{}, errors.New("connection to DB not found")
 	}
 
 	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID)
@@ -116,28 +111,19 @@ func saveData(data JSONData) (JSONData, error) {
 	return data, nil
 }
 
-type BatchStruct struct {
-	MX      sync.Mutex
-	Content []byte
-}
+func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
-func HandleBatch(batchData *BatchStruct) ([]byte, error) {
+	var savingData []DBStorage
 
-	batchData.MX.Lock()
-	defer batchData.MX.Unlock()
-
-	var savingData []JSONData
-
-	err := json.Unmarshal(batchData.Content, &savingData)
+	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
 		return nil, err
 	}
 
 	for i, v := range savingData {
 		//linkID := sha1hash.Create(v.Link, 8)
-		savingData[i].ID = v.CorrelationID
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
-		savingData[i].CorrelationID = v.CorrelationID
+		savingData[i].ID = v.ID
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
 		savingData[i].Link = v.Link
 	}
 
@@ -149,12 +135,12 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.CorrelationID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID)
 	}
 	br := connection.SendBatch(db.GetCtx(), &batch)
 	defer br.Close()
 	_, err = br.Exec()
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), `SQLSTATE 23505`) {
 		return nil, err
 	}
 	//err = br.Close()

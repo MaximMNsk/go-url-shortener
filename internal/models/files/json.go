@@ -9,34 +9,32 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 )
 
-type JSONData struct {
-	Link          string `json:"original_url"`
-	ShortLink     string `json:"short_url"`
-	ID            string
-	CorrelationID string `json:"correlation_id"`
+type FileStorage struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+	ID        string `json:"correlation_id"`
 }
 
-func (jsonData *JSONData) Get() error {
+func (jsonData *FileStorage) Get() (string, error) {
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Get from file: "+fileName)
-	var savedData []JSONData
+	var savedData []FileStorage
 	jsonString, err := getData(fileName)
-	if err == nil {
-		err = json.Unmarshal([]byte(jsonString), &savedData)
-		if err == nil {
-			for _, v := range savedData {
-				if v.ID == jsonData.ID || v.Link == jsonData.Link {
-					jsonData.ID = v.ID
-					jsonData.Link = v.Link
-					jsonData.ShortLink = v.ShortLink
-				}
-			}
+	if err != nil {
+		return "", err
+	}
+	err = json.Unmarshal([]byte(jsonString), &savedData)
+	if err != nil {
+		return "", err
+	}
+	for _, v := range savedData {
+		if v.ID == jsonData.ID || v.Link == jsonData.Link {
+			return v.Link, nil
 		}
 	}
-	return err
+	return "", errors.New("no data found")
 }
 
 func getData(fileName string) (string, error) {
@@ -71,11 +69,11 @@ func getData(fileName string) (string, error) {
 	return result, err
 }
 
-func (jsonData *JSONData) Set() error {
+func (jsonData *FileStorage) Set() error {
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Set to file: "+fileName)
-	var toSave []JSONData
-	var savedData []JSONData
+	var toSave []FileStorage
+	var savedData []FileStorage
 	jsonString, err := getData(fileName)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Setter. Json string: "+jsonString+". Error: "+err.Error())
@@ -138,29 +136,21 @@ func saveData(data []byte, fileName string) bool {
 	}
 }
 
-type BatchStruct struct {
-	MX      sync.Mutex
-	Content []byte
-}
+func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 
-func HandleBatch(batchData *BatchStruct) ([]byte, error) {
-
-	batchData.MX.Lock()
-	defer batchData.MX.Unlock()
-
-	var savingData []JSONData
-	err := json.Unmarshal(batchData.Content, &savingData)
+	var savingData []FileStorage
+	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
-		return []byte(""), err
+		return nil, err
 	}
 
 	for i, v := range savingData {
-		savingData[i].ID = v.CorrelationID
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.CorrelationID)
+		savingData[i].ID = v.ID
+		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
 	}
 
 	///////// Current logic
-	var savedData []JSONData
+	var savedData []FileStorage
 
 	fileName := confModule.Config.Final.LinkFile
 	jsonString, err := getData(fileName)
@@ -169,7 +159,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	} else {
 		err = json.Unmarshal([]byte(jsonString), &savedData)
 		if err != nil {
-			return []byte(""), err
+			return nil, err
 		}
 	}
 
@@ -177,7 +167,7 @@ func HandleBatch(batchData *BatchStruct) ([]byte, error) {
 	var content []byte
 	content, err = json.Marshal(toSave)
 	if err != nil {
-		return []byte(""), err
+		return nil, err
 	}
 
 	isOk := saveData(content, fileName)
