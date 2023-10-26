@@ -274,11 +274,9 @@ func initStorage(data *InputData) model.Storable {
 			Link:      data.Link,
 			ShortLink: data.ShortLink,
 		}
-		logger.PrintLog(logger.DEBUG, `Config.Env.DB: `+confModule.Config.Env.DB)
-		logger.PrintLog(logger.DEBUG, `Config.Flag.DB: `+confModule.Config.Flag.DB)
 		return storage
 	}
-	if confModule.Config.Env.LinkFile != "" || confModule.Config.Flag.LinkFile != "" {
+	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
 		storage = &files.FileStorage{
 			ID:        data.ID,
 			Link:      data.Link,
@@ -304,7 +302,7 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
-	if confModule.Config.Final.DB != "" {
+	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
 		err := db.Connect()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Failed connect to DB")
