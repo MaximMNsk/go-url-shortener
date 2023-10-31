@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
@@ -9,15 +10,25 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 type FileStorage struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
 	ID        string `json:"correlation_id"`
+	Ctx       context.Context
+}
+
+func (jsonData *FileStorage) Init(link, shortLink, id string, ctx context.Context) {
+	jsonData.ID = id
+	jsonData.Link = link
+	jsonData.ShortLink = shortLink
+	jsonData.Ctx = ctx
 }
 
 func (jsonData *FileStorage) Get() (string, error) {
+
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Get from file: "+fileName)
 	var savedData []FileStorage
@@ -38,6 +49,11 @@ func (jsonData *FileStorage) Get() (string, error) {
 }
 
 func getData(fileName string) (string, error) {
+
+	var mx sync.Mutex
+	mx.Lock()
+	defer mx.Unlock()
+
 	var result string
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
@@ -70,6 +86,7 @@ func getData(fileName string) (string, error) {
 }
 
 func (jsonData *FileStorage) Set() error {
+
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Set to file: "+fileName)
 	var toSave []FileStorage
@@ -101,6 +118,11 @@ func (jsonData *FileStorage) Set() error {
 }
 
 func saveData(data []byte, fileName string) bool {
+
+	var mx sync.Mutex
+	mx.Lock()
+	defer mx.Unlock()
+
 	var dir = filepath.Dir(fileName)
 	logger.PrintLog(logger.INFO, "Saver. Extracted dir: "+dir)
 	_, err := os.Stat(dir)
@@ -136,17 +158,31 @@ func saveData(data []byte, fileName string) bool {
 	}
 }
 
+type outputBatch struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortUrl      string `json:"short_url"`
+}
+
 func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 
+	var mx sync.Mutex
+	mx.Lock()
+	defer mx.Unlock()
+
 	var savingData []FileStorage
+	var outputData []outputBatch
+
 	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
 		return nil, err
 	}
 
 	for i, v := range savingData {
+		shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
 		savingData[i].ID = v.ID
-		savingData[i].ShortLink = shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
+		savingData[i].ShortLink = shortLink
+
+		outputData = append(outputData, outputBatch{ShortUrl: shortLink, CorrelationID: v.ID})
 	}
 
 	///////// Current logic
@@ -177,7 +213,7 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 	}
 	//////// End logic
 
-	JSONResp, err := json.Marshal(savingData)
+	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
 		logger.PrintLog(logger.WARN, err.Error())
 	}

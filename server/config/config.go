@@ -79,7 +79,7 @@ func setDefaults() {
 	Config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 	Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 	rootPath, _ := pathhandler.ProjectRoot()
-	Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/links.json")
+	Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/files/links.json")
 	Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
 }
 
@@ -90,7 +90,7 @@ func parseEnv() {
 	}
 }
 
-func HandleConfig() error {
+func HandleConfig() (OuterConfig, error) {
 
 	setDefaults()
 	parseEnv()
@@ -129,5 +129,5 @@ func HandleConfig() error {
 	}
 
 	err := Config.handleFinal()
-	return err
+	return Config, err
 }
