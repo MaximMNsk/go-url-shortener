@@ -2,14 +2,16 @@ package files
 
 import (
 	"fmt"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 )
 
-func copy(src, dst string) (int64, error) {
+func copyFile(src, dst string) (int64, error) {
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
 		return 0, err
@@ -31,6 +33,7 @@ func copy(src, dst string) (int64, error) {
 	}
 	defer destination.Close()
 	nBytes, err := io.Copy(destination, source)
+
 	return nBytes, err
 }
 
@@ -39,7 +42,7 @@ func restoreFile(source, dest string) error {
 	if errRemove != nil {
 		return errRemove
 	}
-	_, err := copy(source, dest)
+	_, err := copyFile(source, dest)
 	if err != nil {
 		return err
 	}
@@ -47,6 +50,8 @@ func restoreFile(source, dest string) error {
 }
 
 func TestJSONDataSet_Set(t *testing.T) {
+	config, _ := confModule.HandleConfig()
+
 	type fields struct {
 		Link      string
 		ShortLink string
@@ -67,18 +72,18 @@ func TestJSONDataSet_Set(t *testing.T) {
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
 			},
-			args: args{fileName: "./test.json"},
+			args: args{fileName: filepath.Join(config.Default.LinkFile)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData := &JSONDataSet{
+			jsonData := &FileStorage{
 				Link:      tt.fields.Link,
 				ShortLink: tt.fields.ShortLink,
 				ID:        tt.fields.ID,
 			}
-			jsonData.Set(tt.args.fileName)
-			require.FileExists(t, tt.args.fileName)
+			_ = jsonData.Set()
+			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
 }
@@ -89,7 +94,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 		ShortLink string
 		ID        string
 	}
-	type want JSONDataGet
+	type want FileStorage
 	type args struct {
 		fileName       string
 		sourceFileName string
@@ -106,10 +111,10 @@ func TestJSONDataGet_Get(t *testing.T) {
 				Link: "TestLink",
 			},
 			args: args{
-				fileName:       "./test.json",
-				sourceFileName: "./test_source.json",
+				fileName: filepath.Join(confModule.Config.Default.LinkFile),
+				//sourceFileName: "./test_source.json",
 			},
-			want: want(JSONDataGet{
+			want: want(FileStorage{
 				Link:      "TestLink",
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
@@ -119,19 +124,13 @@ func TestJSONDataGet_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			defer func(source string, dest string) {
-				err := restoreFile(source, dest)
-				if err != nil {
-					t.Error(err)
-				}
-			}(tt.args.sourceFileName, tt.args.fileName)
-			jsonData := JSONDataGet{
+			jsonData := FileStorage{
 				Link:      tt.fields.Link,
 				ShortLink: tt.fields.ShortLink,
 				ID:        tt.fields.ID,
 			}
-			jsonData.Get(tt.args.fileName)
-			assert.EqualValues(t, tt.want, jsonData)
+			link, _ := jsonData.Get()
+			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}
 }

@@ -1,13 +1,18 @@
 package http
 
 import (
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"net/http"
 )
 
 /**
  * Responses
  */
+
+type Additional struct {
+	Place     string
+	OuterData string
+	InnerData string
+}
 
 func BadRequest(w http.ResponseWriter) {
 	http.Error(w, "400 bad request", http.StatusBadRequest)
@@ -17,10 +22,10 @@ func InternalError(w http.ResponseWriter) {
 	http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 }
 
-func TempRedirect(w http.ResponseWriter, addData confModule.Additional) {
+func TempRedirect(w http.ResponseWriter, addData Additional) {
 	successAnswer(w, http.StatusTemporaryRedirect, addData)
 }
-func successAnswer(w http.ResponseWriter, status int, additionalData confModule.Additional) {
+func successAnswer(w http.ResponseWriter, status int, additionalData Additional) {
 	w.Header().Add("Content-Type", "text/plain")
 	if additionalData.Place == "header" {
 		w.Header().Add(additionalData.OuterData, additionalData.InnerData)
@@ -31,11 +36,20 @@ func successAnswer(w http.ResponseWriter, status int, additionalData confModule.
 	}
 }
 
-func Created(w http.ResponseWriter, addData confModule.Additional) {
+func Ok(w http.ResponseWriter) {
+	addData := Additional{}
+	successAnswer(w, http.StatusOK, addData)
+}
+
+func Created(w http.ResponseWriter, addData Additional) {
 	successAnswer(w, http.StatusCreated, addData)
 }
 
-func successAnswerJSON(w http.ResponseWriter, status int, additionalData confModule.Additional) {
+func Conflict(w http.ResponseWriter, addData Additional) {
+	successAnswer(w, http.StatusConflict, addData)
+}
+
+func successAnswerJSON(w http.ResponseWriter, status int, additionalData Additional) {
 	w.Header().Add("Content-Type", "application/json")
 	if additionalData.Place == "header" {
 		w.Header().Add(additionalData.OuterData, additionalData.InnerData)
@@ -46,6 +60,10 @@ func successAnswerJSON(w http.ResponseWriter, status int, additionalData confMod
 	}
 }
 
-func CreatedJSON(w http.ResponseWriter, addData confModule.Additional) {
+func CreatedJSON(w http.ResponseWriter, addData Additional) {
 	successAnswerJSON(w, http.StatusCreated, addData)
+}
+
+func ConflictJSON(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusConflict, addData)
 }

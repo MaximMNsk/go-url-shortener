@@ -16,7 +16,10 @@ cmd/shortener/main
 cmd/shortener/shortener
 
 # Storage
-#internal/storage
+# internal/storage
+
+# Tests
+tests/
 
 # Dependency directories (remove the comment below to include it)
 vendor/
@@ -24,3 +27,4 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+.github
