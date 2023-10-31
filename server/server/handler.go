@@ -255,6 +255,10 @@ func InitStorage() model.Storable {
 	}
 	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
 		storage = &files.FileStorage{}
+		err := files.MakeStorageFile(confModule.Config.Final.LinkFile)
+		if err != nil {
+			logger.PrintLog(logger.ERROR, err.Error())
+		}
 		return storage
 	}
 	storage = &memory.MemStorage{

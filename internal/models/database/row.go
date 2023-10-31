@@ -139,7 +139,7 @@ func saveData(data DBStorage) (DBStorage, error) {
 
 type outputBatch struct {
 	CorrelationID string `json:"correlation_id"`
-	ShortUrl      string `json:"short_url"`
+	ShortURL      string `json:"short_url"`
 }
 
 func (jsonData *DBStorage) BatchSet() ([]byte, error) {
@@ -163,7 +163,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		savingData[i].ShortLink = shortLink
 		savingData[i].Link = v.Link
 
-		outputData = append(outputData, outputBatch{ShortUrl: shortLink, CorrelationID: v.ID})
+		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
 	///////// Current logic

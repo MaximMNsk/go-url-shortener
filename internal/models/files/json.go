@@ -27,11 +27,17 @@ func (jsonData *FileStorage) Init(link, shortLink, id string, ctx context.Contex
 	jsonData.Ctx = ctx
 }
 
+type inputOutputData struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+	ID        string `json:"correlation_id"`
+}
+
 func (jsonData *FileStorage) Get() (string, error) {
 
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Get from file: "+fileName)
-	var savedData []FileStorage
+	var savedData []inputOutputData
 	jsonString, err := getData(fileName)
 	if err != nil {
 		return "", err
@@ -89,26 +95,33 @@ func (jsonData *FileStorage) Set() error {
 
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Set to file: "+fileName)
-	var toSave []FileStorage
-	var savedData []FileStorage
+
+	var toSave []inputOutputData
+	var savedData []inputOutputData
+
+	preparedData := inputOutputData{
+		Link:      jsonData.Link,
+		ShortLink: jsonData.ShortLink,
+		ID:        jsonData.ID,
+	}
+
 	jsonString, err := getData(fileName)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Setter. Json string: "+jsonString+". Error: "+err.Error())
 	}
-	//if err == nil {
+
 	err = json.Unmarshal([]byte(jsonString), &savedData)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Setter. Unmarshal json string: "+jsonString+". Error: "+err.Error())
 	}
-	//if err == nil {
-	toSave = append(savedData, *jsonData)
+
+	toSave = append(savedData, preparedData)
 	var content []byte
 	content, err = json.Marshal(toSave)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Setter. Marshal new json string: "+jsonString+". Error: "+err.Error())
 	}
 
-	//if err == nil {
 	isOk := saveData(content, fileName)
 	if !isOk {
 		err = errors.New("can't save")
@@ -122,20 +135,6 @@ func saveData(data []byte, fileName string) bool {
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
-
-	var dir = filepath.Dir(fileName)
-	logger.PrintLog(logger.INFO, "Saver. Extracted dir: "+dir)
-	_, err := os.Stat(dir)
-	if err != nil {
-		logger.PrintLog(logger.WARN, "Saver. Cannot get stat directory: "+err.Error())
-	}
-	if os.IsNotExist(err) {
-		logger.PrintLog(logger.INFO, "Saver. Creating dir: "+dir)
-		err = os.Mkdir(dir, 0644)
-		if err != nil {
-			logger.PrintLog(logger.ERROR, "Saver. Cannot create directory: "+err.Error())
-		}
-	}
 
 	logger.PrintLog(logger.INFO, "Saver. Directory created")
 
@@ -158,9 +157,33 @@ func saveData(data []byte, fileName string) bool {
 	}
 }
 
+func MakeStorageFile(fileName string) error {
+	var dir = filepath.Dir(fileName)
+	logger.PrintLog(logger.INFO, "Saver. Extracted dir: "+dir)
+	_, err := os.Stat(dir)
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Saver. Cannot get stat directory: "+err.Error())
+		return err
+	}
+	if os.IsNotExist(err) {
+		logger.PrintLog(logger.INFO, "Saver. Creating dir: "+dir)
+		err = os.Mkdir(dir, 0644)
+		if err != nil {
+			logger.PrintLog(logger.ERROR, "Saver. Cannot create directory: "+err.Error())
+			return err
+		}
+	}
+	_, err = os.Create(fileName)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Saver. Cannot create file: "+err.Error())
+		return err
+	}
+	return nil
+}
+
 type outputBatch struct {
 	CorrelationID string `json:"correlation_id"`
-	ShortUrl      string `json:"short_url"`
+	ShortURL      string `json:"short_url"`
 }
 
 func (jsonData *FileStorage) BatchSet() ([]byte, error) {
@@ -182,7 +205,7 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		savingData[i].ID = v.ID
 		savingData[i].ShortLink = shortLink
 
-		outputData = append(outputData, outputBatch{ShortUrl: shortLink, CorrelationID: v.ID})
+		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
 	///////// Current logic

@@ -78,7 +78,7 @@ func (jsonData *MemStorage) Set() error {
 
 type outputBatch struct {
 	CorrelationID string `json:"correlation_id"`
-	ShortUrl      string `json:"short_url"`
+	ShortURL      string `json:"short_url"`
 }
 
 func (jsonData *MemStorage) BatchSet() ([]byte, error) {
@@ -105,7 +105,7 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 			ID:        savingData[i].ID,
 		}
 		jsonData.Storage.Set(toStore)
-		outputData = append(outputData, outputBatch{ShortUrl: shortLink, CorrelationID: v.ID})
+		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
 	JSONResp, err := json.Marshal(outputData)
