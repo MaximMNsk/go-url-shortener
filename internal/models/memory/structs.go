@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
+	memoryStorage "github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
