@@ -1,4 +1,4 @@
-package memory_storage
+package memorystorage
 
 type StorageItem struct {
 	Link      string
