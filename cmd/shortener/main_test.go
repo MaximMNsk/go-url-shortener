@@ -2,6 +2,7 @@ package main
 
 import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -57,7 +58,10 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
-	_ = confModule.HandleConfig()
+	config, _ := confModule.HandleConfig()
+	storage := server.InitStorage()
+	serve := server.NewServ(config, storage)
+
 	for _, tt := range tests {
 
 		t.Run(tt.name, func(t *testing.T) {
@@ -65,7 +69,7 @@ func Test_handleMainPage(t *testing.T) {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)
 				w := httptest.NewRecorder()
-				handlePOST(w, request)
+				serve.HandlePOST(w, request)
 
 				result := w.Result()
 				assert.Equal(t, tt.want.statusCode, result.StatusCode)

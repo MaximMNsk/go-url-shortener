@@ -50,7 +50,7 @@ func restoreFile(source, dest string) error {
 }
 
 func TestJSONDataSet_Set(t *testing.T) {
-	_ = confModule.HandleConfig()
+	config, _ := confModule.HandleConfig()
 
 	type fields struct {
 		Link      string
@@ -72,7 +72,7 @@ func TestJSONDataSet_Set(t *testing.T) {
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
 			},
-			args: args{fileName: filepath.Join(confModule.Config.Default.LinkFile)},
+			args: args{fileName: filepath.Join(config.Default.LinkFile)},
 		},
 	}
 	for _, tt := range tests {
