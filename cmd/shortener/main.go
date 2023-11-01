@@ -5,7 +5,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
@@ -56,10 +55,10 @@ func main() {
 		r.Post(`/api/shorten/{query}`, newServ.HandleAPI)
 		r.Get(`/ping`, newServ.HandlePing)
 		r.Get(`/{query}`, newServ.HandleGET)
-		newServ.Routers.Group(func(r chi.Router) {
-			r.Use(cookie.AuthHandler)
-			r.Get(`/api/user/{query}`, newServ.HandleAPI)
-		})
+		r.Get(`/api/user/{query}`, newServ.HandleAPI)
+		//newServ.Routers.Group(func(r chi.Router) {
+		//	r.Use(cookie.AuthHandler)
+		//})
 	})
 
 	logger.PrintLog(logger.INFO, "Starting newServ")
