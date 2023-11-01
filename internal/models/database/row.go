@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS shortener.short_links
 	    id serial primary key,
 	    original_url text,
 	    short_url text,
-	    uid text
+	    uid text,
+		user_id text
 	)`
 
 const createIndexQuery = `
