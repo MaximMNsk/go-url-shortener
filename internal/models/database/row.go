@@ -100,13 +100,13 @@ func getData(data DBStorage) (DBStorage, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	userID := ctx.Value(`UserID`)
-	query := selectRowByUser
-	row := connection.QueryRow(ctx, query, data.ID, data.Link, userID)
-	if userID == `` || userID == nil {
-		query = selectRow
-		row = connection.QueryRow(ctx, query, data.ID, data.Link)
-	}
+	//userID := ctx.Value(`UserID`)
+	//query := selectRowByUser
+	//row := connection.QueryRow(ctx, query, data.ID, data.Link, userID)
+	//if userID == `` || userID == nil {
+	query := selectRow
+	row := connection.QueryRow(ctx, query, data.ID, data.Link)
+	//}
 
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {

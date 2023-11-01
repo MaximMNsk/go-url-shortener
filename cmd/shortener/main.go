@@ -51,13 +51,15 @@ func main() {
 		With(compress.GzipHandler).
 		With(server.HandleOther)
 	newServ.Routers.Route("/", func(r chi.Router) {
-		r.Use(cookie.AuthHandler)
 		r.Post(`/`, newServ.HandlePOST)
 		r.Post(`/api/{query}`, newServ.HandleAPI)
 		r.Post(`/api/shorten/{query}`, newServ.HandleAPI)
 		r.Get(`/ping`, newServ.HandlePing)
 		r.Get(`/{query}`, newServ.HandleGET)
-		r.Get(`/api/user/{query}`, newServ.HandleAPI)
+		newServ.Routers.Group(func(r chi.Router) {
+			r.Use(cookie.AuthHandler)
+			r.Get(`/api/user/{query}`, newServ.HandleAPI)
+		})
 	})
 
 	logger.PrintLog(logger.INFO, "Starting newServ")

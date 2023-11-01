@@ -38,12 +38,13 @@ func AuthHandler(next http.Handler) http.Handler {
 				Expires: time.Now().Add(TokenExp),
 				Path:    `/`,
 			}
-			http.SetCookie(w, cookie)
-			userNumber := UserNum(`UserID`)
-			ctx := context.WithValue(r.Context(), userNumber, UserID)
-			newReqCtx := r.WithContext(ctx)
-			next.ServeHTTP(w, newReqCtx)
-			//next.ServeHTTP(w, r)
+			fmt.Println(cookie)
+			//http.SetCookie(w, cookie)
+			//userNumber := UserNum(`UserID`)
+			//ctx := context.WithValue(r.Context(), userNumber, UserID)
+			//newReqCtx := r.WithContext(ctx)
+			//next.ServeHTTP(w, newReqCtx)
+			next.ServeHTTP(w, r)
 			return
 		}
 
