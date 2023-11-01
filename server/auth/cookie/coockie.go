@@ -8,6 +8,7 @@ import (
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/golang-jwt/jwt/v4"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -15,6 +16,61 @@ import (
 //var UserID int
 
 type UserNum string
+
+func AuthSetter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := r.Cookie("token")
+
+		UserID, errUserId := randomizer.RandDigitalBytes(3)
+		if errUserId != nil {
+			logger.PrintLog(logger.WARN, err.Error())
+		}
+
+		if err != nil && strings.Contains(err.Error(), `not present`) {
+			logInfo := fmt.Sprintf("Set userID: %d", UserID)
+			logger.PrintLog(logger.INFO, logInfo)
+			if err != nil {
+				logger.PrintLog(logger.WARN, err.Error())
+			}
+			newToken, err := BuildJWTString(UserID)
+			if err != nil {
+				logger.PrintLog(logger.WARN, err.Error())
+			}
+			logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
+			cookie := &http.Cookie{
+				Name:    `token`,
+				Value:   newToken,
+				Expires: time.Now().Add(TokenExp),
+				Path:    `/`,
+			}
+			http.SetCookie(w, cookie)
+		}
+		userNumber := UserNum(`UserID`)
+		ctx := context.WithValue(r.Context(), userNumber, strconv.Itoa(UserID))
+		newReqCtx := r.WithContext(ctx)
+		next.ServeHTTP(w, newReqCtx)
+	})
+}
+
+func AuthChecker(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := r.Cookie("token")
+		if err == nil {
+			logger.PrintLog(logger.DEBUG, `Present token: `+token.Value)
+			UserID := GetUserID(token.Value)
+			logger.PrintLog(logger.DEBUG, `Present userID: `+strconv.Itoa(UserID))
+			if UserID > 0 {
+				userNumber := UserNum(`UserID`)
+				ctx := context.WithValue(r.Context(), userNumber, int(UserID))
+				newReqCtx := r.WithContext(ctx)
+				next.ServeHTTP(w, newReqCtx)
+				return
+			}
+		}
+		additional := httpResp.Additional{}
+		httpResp.Unauthorized(w, additional)
+	})
+}
 
 func AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -38,13 +94,12 @@ func AuthHandler(next http.Handler) http.Handler {
 				Expires: time.Now().Add(TokenExp),
 				Path:    `/`,
 			}
-			fmt.Println(cookie)
-			//http.SetCookie(w, cookie)
-			//userNumber := UserNum(`UserID`)
-			//ctx := context.WithValue(r.Context(), userNumber, UserID)
-			//newReqCtx := r.WithContext(ctx)
-			//next.ServeHTTP(w, newReqCtx)
-			next.ServeHTTP(w, r)
+			http.SetCookie(w, cookie)
+			userNumber := UserNum(`UserID`)
+			ctx := context.WithValue(r.Context(), userNumber, UserID)
+			newReqCtx := r.WithContext(ctx)
+			next.ServeHTTP(w, newReqCtx)
+			//next.ServeHTTP(w, r)
 			return
 		}
 

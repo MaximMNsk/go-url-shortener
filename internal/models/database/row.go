@@ -7,9 +7,11 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"strconv"
 	"sync"
 )
 
@@ -101,9 +103,9 @@ func getData(data DBStorage) (DBStorage, error) {
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	//userID := ctx.Value(`UserID`)
+	//userID := ctx.Value(cookie.UserNum(`UserID`))
 	//query := selectRowByUser
-	//row := connection.QueryRow(ctx, query, data.ID, data.Link, userID)
+	//row := connection.QueryRow(ctx, query, data.ID, data.Link, strconv.Itoa(userID.(int)))
 	//if userID == `` || userID == nil {
 	query := selectRow
 	row := connection.QueryRow(ctx, query, data.ID, data.Link)
@@ -140,9 +142,9 @@ func saveData(data DBStorage) (DBStorage, error) {
 		return DBStorage{}, errors.New("connection to DB not found")
 	}
 
-	userID := ctx.Value(`UserID`)
+	userID := ctx.Value(cookie.UserNum(`UserID`))
 
-	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
+	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
@@ -182,7 +184,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
-	userID := jsonData.Ctx.Value(`UserID`)
+	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
 	///////// Current logic
 	connection := db.GetDB()
@@ -192,7 +194,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID.(string))
 	}
 	br := connection.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
@@ -226,9 +228,9 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 		return nil, errors.New("connection to DB not found")
 	}
 
-	userID := jsonData.Ctx.Value(`UserID`)
+	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
-	rows, err := connection.Query(jsonData.Ctx, selectAllRows, userID)
+	rows, err := connection.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
