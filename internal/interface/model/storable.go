@@ -7,4 +7,5 @@ type Storable interface {
 	Get() (string, error)
 	Set() error
 	BatchSet() ([]byte, error)
+	HandleUserUrls() ([]byte, error)
 }

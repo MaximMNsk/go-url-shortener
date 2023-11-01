@@ -115,3 +115,24 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 
 	return JSONResp, nil
 }
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
+	storage := jsonData.Storage.Get()
+	if len(storage) > 0 {
+		var resp JSONCutted
+		var batchResp []JSONCutted
+		for _, v := range storage {
+			resp.Link = v.Link
+			resp.ShortLink = v.ShortLink
+			batchResp = append(batchResp, resp)
+		}
+		JSONResp, err := json.Marshal(batchResp)
+		return JSONResp, err
+	}
+	return nil, nil
+}

@@ -104,6 +104,7 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 	availableCurls := make(controllers)
 	availableCurls["shorten"] = true
 	availableCurls["batch"] = true
+	availableCurls["urls"] = true
 
 	if !availableCurls[ctrl] {
 		httpResp.BadRequest(res)
@@ -119,6 +120,33 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 		HandleAPIBatch(res, req, s)
 		return
 	}
+
+	if ctrl == `urls` {
+		HandleAPIUserUrls(res, req, s)
+		return
+	}
+}
+
+func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
+
+	s.Storage.Init(``, ``, ``, req.Context())
+	byteRes, err := s.Storage.HandleUserUrls()
+
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
+	if byteRes == nil {
+		httpResp.NoContent(res, httpResp.Additional{})
+		return
+	}
+
+	additional := httpResp.Additional{
+		Place:     "body",
+		InnerData: string(byteRes),
+	}
+	httpResp.OkAdditionalJSON(res, additional)
 }
 
 func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {

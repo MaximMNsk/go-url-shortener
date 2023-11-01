@@ -45,14 +45,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_original_url
 ON shortener.short_links(original_url)`
 
 const insertLinkRow = `
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const insertLinkRowBatch = `
 
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
+select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) and user_id = $3`
+
+const selectAllRows = `
+select original_url, short_url from shortener.short_links where user_id = $1`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -91,10 +94,12 @@ func getData(data DBStorage) (DBStorage, error) {
 	ctx := data.Ctx
 	connection := db.GetDB()
 	selected := DBStorage{}
+	userID := ctx.Value(`UserID`)
+
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
+	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link, userID)
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
@@ -126,7 +131,9 @@ func saveData(data DBStorage) (DBStorage, error) {
 		return DBStorage{}, errors.New("connection to DB not found")
 	}
 
-	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID)
+	userID := ctx.Value(`UserID`)
+
+	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
@@ -166,6 +173,8 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
+	userID := jsonData.Ctx.Value(`UserID`)
+
 	///////// Current logic
 	connection := db.GetDB()
 	if connection == nil {
@@ -174,7 +183,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID)
 	}
 	br := connection.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
@@ -194,4 +203,35 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	}
 
 	return JSONResp, nil
+}
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
+	var batchResp []JSONCutted
+	connection := db.GetDB()
+	if connection == nil {
+		return nil, errors.New("connection to DB not found")
+	}
+
+	userID := jsonData.Ctx.Value(`UserID`)
+
+	rows, err := connection.Query(jsonData.Ctx, selectAllRows, userID)
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
+	}
+	for rows.Next() {
+		var selected JSONCutted
+		_ = rows.Scan(&selected.Link, &selected.ShortLink)
+		batchResp = append(batchResp, selected)
+	}
+	if len(batchResp) > 0 {
+		JSONResp, err := json.Marshal(batchResp)
+		return JSONResp, err
+	}
+
+	return nil, nil
 }
