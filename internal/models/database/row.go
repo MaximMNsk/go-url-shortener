@@ -52,6 +52,9 @@ const insertLinkRowBatch = `
 insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
+select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2)`
+
+const selectRowByUser = `
 select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) and user_id = $3`
 
 const selectAllRows = `
@@ -92,14 +95,19 @@ func getData(data DBStorage) (DBStorage, error) {
 	defer mx.Unlock()
 
 	ctx := data.Ctx
-	connection := db.GetDB()
 	selected := DBStorage{}
-	userID := ctx.Value(`UserID`)
-
+	connection := db.GetDB()
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link, userID)
+	userID := ctx.Value(`UserID`)
+	query := selectRowByUser
+	row := connection.QueryRow(ctx, query, data.ID, data.Link, userID)
+	if userID == `` || userID == nil {
+		query = selectRow
+		row = connection.QueryRow(ctx, query, data.ID, data.Link)
+	}
+
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
