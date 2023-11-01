@@ -21,17 +21,14 @@ func AuthSetter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := r.Cookie("token")
 
-		UserID, errUserId := randomizer.RandDigitalBytes(3)
-		if errUserId != nil {
+		UserID, errUserID := randomizer.RandDigitalBytes(3)
+		if errUserID != nil {
 			logger.PrintLog(logger.WARN, err.Error())
 		}
 
 		if err != nil && strings.Contains(err.Error(), `not present`) {
 			logInfo := fmt.Sprintf("Set userID: %d", UserID)
 			logger.PrintLog(logger.INFO, logInfo)
-			if err != nil {
-				logger.PrintLog(logger.WARN, err.Error())
-			}
 			newToken, err := BuildJWTString(UserID)
 			if err != nil {
 				logger.PrintLog(logger.WARN, err.Error())
