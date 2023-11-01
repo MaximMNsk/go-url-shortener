@@ -14,6 +14,8 @@ import (
 
 //var UserID int
 
+type UserNum string
+
 func AuthHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := r.Cookie("token")
@@ -37,7 +39,9 @@ func AuthHandler(next http.Handler) http.Handler {
 				Path:    `/`,
 			}
 			http.SetCookie(w, cookie)
-			ctx := context.WithValue(r.Context(), `UserID`, UserID)
+			var userNumber UserNum
+			userNumber = `UserID`
+			ctx := context.WithValue(r.Context(), userNumber, UserID)
 			newReqCtx := r.WithContext(ctx)
 			next.ServeHTTP(w, newReqCtx)
 			//next.ServeHTTP(w, r)
@@ -48,7 +52,9 @@ func AuthHandler(next http.Handler) http.Handler {
 		UserID := GetUserID(token.Value)
 
 		if UserID > 0 {
-			ctx := context.WithValue(r.Context(), `UserID`, UserID)
+			var userNumber UserNum
+			userNumber = `UserID`
+			ctx := context.WithValue(r.Context(), userNumber, UserID)
 			newReqCtx := r.WithContext(ctx)
 			next.ServeHTTP(w, newReqCtx)
 			return
