@@ -65,7 +65,7 @@ func AuthChecker(next http.Handler) http.Handler {
 			}
 		}
 		additional := httpResp.Additional{}
-		httpResp.Unauthorized(w, additional)
+		httpResp.NoContent(w, additional)
 	})
 }
 
