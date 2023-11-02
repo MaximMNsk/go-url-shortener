@@ -7,9 +7,11 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"strconv"
 	"sync"
 )
 
@@ -37,7 +39,8 @@ CREATE TABLE IF NOT EXISTS shortener.short_links
 	    id serial primary key,
 	    original_url text,
 	    short_url text,
-	    uid text
+	    uid text,
+		user_id text
 	)`
 
 const createIndexQuery = `
@@ -45,14 +48,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS unique_original_url
 ON shortener.short_links(original_url)`
 
 const insertLinkRow = `
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const insertLinkRowBatch = `
 
-insert into shortener.short_links (original_url, short_url, uid) values ($1, $2, $3)`
+insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url from shortener.short_links where uid = $1 or original_url = $2`
+select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2)`
+
+const selectRowByUser = `
+select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) and user_id = $3`
+
+const selectAllRows = `
+select original_url, short_url from shortener.short_links where user_id = $1`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -89,12 +98,19 @@ func getData(data DBStorage) (DBStorage, error) {
 	defer mx.Unlock()
 
 	ctx := data.Ctx
-	connection := db.GetDB()
 	selected := DBStorage{}
+	connection := db.GetDB()
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	row := connection.QueryRow(ctx, selectRow, data.ID, data.Link)
+	//userID := ctx.Value(cookie.UserNum(`UserID`))
+	//query := selectRowByUser
+	//row := connection.QueryRow(ctx, query, data.ID, data.Link, strconv.Itoa(userID.(int)))
+	//if userID == `` || userID == nil {
+	query := selectRow
+	row := connection.QueryRow(ctx, query, data.ID, data.Link)
+	//}
+
 	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
@@ -126,7 +142,9 @@ func saveData(data DBStorage) (DBStorage, error) {
 		return DBStorage{}, errors.New("connection to DB not found")
 	}
 
-	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID)
+	userID := ctx.Value(cookie.UserNum(`UserID`))
+
+	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
@@ -166,6 +184,8 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
+	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+
 	///////// Current logic
 	connection := db.GetDB()
 	if connection == nil {
@@ -174,7 +194,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID)
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID.(string))
 	}
 	br := connection.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
@@ -194,4 +214,35 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	}
 
 	return JSONResp, nil
+}
+
+type JSONCutted struct {
+	Link      string `json:"original_url"`
+	ShortLink string `json:"short_url"`
+}
+
+func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
+	var batchResp []JSONCutted
+	connection := db.GetDB()
+	if connection == nil {
+		return nil, errors.New("connection to DB not found")
+	}
+
+	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+
+	rows, err := connection.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
+	if err != nil {
+		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
+	}
+	for rows.Next() {
+		var selected JSONCutted
+		_ = rows.Scan(&selected.Link, &selected.ShortLink)
+		batchResp = append(batchResp, selected)
+	}
+	if len(batchResp) > 0 {
+		JSONResp, err := json.Marshal(batchResp)
+		return JSONResp, err
+	}
+
+	return nil, nil
 }
