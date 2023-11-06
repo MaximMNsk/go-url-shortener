@@ -4,13 +4,12 @@ import (
 	"context"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/jackc/pgx/v5"
-	_ "github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var (
-	db *pgx.Conn
+	DB *pgxpool.Pool
 )
 
 var ctx context.Context
@@ -18,13 +17,14 @@ var ctx context.Context
 func Connect() error {
 	ctx = context.Background()
 	logger.PrintLog(logger.INFO, config.Config.Final.DB)
-	database, err := pgx.Connect(ctx, config.Config.Final.DB)
-	db = database
+	//database, err := pgx.Connect(ctx, config.Config.Final.DB)
+	database, err := pgxpool.New(ctx, config.Config.Final.DB)
+	DB = database
 	return err
 }
 
-func GetDB() *pgx.Conn {
-	return db
+func GetDB() *pgxpool.Pool {
+	return DB
 }
 
 func GetCtx() context.Context {
@@ -32,10 +32,6 @@ func GetCtx() context.Context {
 }
 
 func Close() error {
-	err := db.Close(ctx)
-	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can't close connection")
-		return err
-	}
+	DB.Close()
 	return nil
 }

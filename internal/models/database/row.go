@@ -12,6 +12,7 @@ import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"math"
 	"strconv"
 	"sync"
@@ -40,12 +41,12 @@ AUTHORIZATION postgres`
 const createTableQuery = `
 CREATE TABLE IF NOT EXISTS shortener.short_links 
 	(
-	    id serial primary key,
-	    original_url text,
-	    short_url text,
-	    uid text,
-		user_id text,
-		is_deleted bool
+	    id serial PRIMARY KEY,
+	    original_url TEXT,
+	    short_url TEXT,
+	    uid TEXT,
+		user_id TEXT,
+		is_deleted BOOLEAN DEFAULT FALSE
 	)`
 
 const createIndexQuery = `
@@ -71,7 +72,7 @@ select original_url, short_url from shortener.short_links where user_id = $1`
 const updateRow = `
 update shortener.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
-func PrepareDB(connect *pgx.Conn) {
+func PrepareDB(connect *pgxpool.Pool) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, "Can't create schema: "+err.Error())
@@ -103,7 +104,6 @@ func getData(data DBStorage) (DBStorage, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
-	defer mx.Unlock()
 
 	ctx := data.Ctx
 	selected := DBStorage{}
@@ -123,6 +123,7 @@ func getData(data DBStorage) (DBStorage, error) {
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
+	mx.Unlock()
 	return selected, nil
 }
 
@@ -142,7 +143,6 @@ func saveData(data DBStorage) (DBStorage, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
-	defer mx.Unlock()
 
 	ctx := data.Ctx
 	connection := db.GetDB()
@@ -160,6 +160,8 @@ func saveData(data DBStorage) (DBStorage, error) {
 		logger.PrintLog(logger.WARN, "Insert attention: "+err.Error())
 		return data, pgErr
 	}
+
+	mx.Unlock()
 	return data, nil
 }
 
@@ -172,13 +174,13 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
-	defer mx.Unlock()
 
 	var savingData []DBStorage
 	var outputData []outputBatch
 
 	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
+		mx.Unlock()
 		return nil, err
 	}
 
@@ -197,6 +199,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	///////// Current logic
 	connection := db.GetDB()
 	if connection == nil {
+		mx.Unlock()
 		return nil, errors.New("connection to DB not found")
 	}
 
@@ -215,12 +218,14 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
 		logger.PrintLog(logger.WARN, err.Error())
+		mx.Unlock()
 		return nil, err
 	}
 	if pgErr != nil {
 		return JSONResp, pgErr
 	}
 
+	mx.Unlock()
 	return JSONResp, nil
 }
 
@@ -264,7 +269,7 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() error {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	maxWorkers := 2
+	maxWorkers := 1
 
 	inputData := input{
 		URLs:   jsonData.Link,
@@ -326,6 +331,10 @@ func explodeURLs(data string) ([]string, error) {
 }
 
 func batchUpdate(data []string, userID int, ctx context.Context) error {
+
+	var mx sync.Mutex
+	mx.Lock()
+
 	connection := db.GetDB()
 	if connection == nil {
 		return errors.New("connection to DB not found")
@@ -343,5 +352,6 @@ func batchUpdate(data []string, userID int, ctx context.Context) error {
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
+	mx.Unlock()
 	return err
 }
