@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
@@ -11,22 +12,25 @@ import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"math"
 	"strconv"
 	"sync"
 )
 
 type DBStorage struct {
-	Link      string `json:"original_url"`
-	ShortLink string `json:"short_url"`
-	ID        string `json:"correlation_id"`
-	Ctx       context.Context
+	Link        string `json:"original_url"`
+	ShortLink   string `json:"short_url"`
+	ID          string `json:"correlation_id"`
+	DeletedFlag bool   `json:"is_deleted"`
+	Ctx         context.Context
 }
 
-func (jsonData *DBStorage) Init(link, shortLink, id string, ctx context.Context) {
+func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
+	jsonData.DeletedFlag = isDeleted
 }
 
 const createSchemaQuery = `
@@ -40,7 +44,8 @@ CREATE TABLE IF NOT EXISTS shortener.short_links
 	    original_url text,
 	    short_url text,
 	    uid text,
-		user_id text
+		user_id text,
+		is_deleted bool
 	)`
 
 const createIndexQuery = `
@@ -55,13 +60,16 @@ const insertLinkRowBatch = `
 insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2)`
+select uid, original_url, short_url, is_deleted from shortener.short_links where (uid = $1 or original_url = $2)`
 
 const selectRowByUser = `
 select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) and user_id = $3`
 
 const selectAllRows = `
 select original_url, short_url from shortener.short_links where user_id = $1`
+
+const updateRow = `
+update shortener.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
 func PrepareDB(connect *pgx.Conn) {
 	_, err := connect.Exec(db.GetCtx(), createSchemaQuery)
@@ -83,11 +91,11 @@ func PrepareDB(connect *pgx.Conn) {
 	}
 }
 
-func (jsonData *DBStorage) Get() (string, error) {
+func (jsonData *DBStorage) Get() (string, bool, error) {
 
 	logger.PrintLog(logger.INFO, "Get from database")
 	row, err := getData(*jsonData)
-	return row.Link, err
+	return row.Link, row.DeletedFlag, err
 
 }
 
@@ -111,7 +119,7 @@ func getData(data DBStorage) (DBStorage, error) {
 	row := connection.QueryRow(ctx, query, data.ID, data.Link)
 	//}
 
-	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink)
+	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
@@ -245,4 +253,95 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	}
 
 	return nil, nil
+}
+
+type input struct {
+	URLs   string
+	UserID int
+}
+
+func (jsonData *DBStorage) HandleUserUrlsDelete() error {
+	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
+	doneCh := make(chan struct{})
+	defer close(doneCh)
+	maxWorkers := 2
+
+	inputData := input{
+		URLs:   jsonData.Link,
+		UserID: userID,
+	}
+
+	update(doneCh, inputData, maxWorkers, jsonData.Ctx)
+
+	return nil
+}
+
+func update(doneCh chan struct{}, data input, countWorkers int, ctx context.Context) {
+	var wg sync.WaitGroup
+
+	explodedData, err := explodeURLs(data.URLs)
+	if err != nil {
+		logger.PrintLog(logger.FATAL, err.Error())
+		return
+	}
+	inputLen := len(explodedData)
+	partLen := int(math.Ceil(float64(inputLen) / float64(countWorkers)))
+
+	for i := 0; i < countWorkers; i++ {
+		wg.Add(1)
+		start := i * partLen
+		end := (i + 1) * partLen
+		if i+1 == countWorkers {
+			end = inputLen
+		}
+		chunk := explodedData[start:end]
+
+		go func() {
+			defer wg.Done()
+
+			select {
+			case <-doneCh:
+				return
+			default:
+				err := batchUpdate(chunk, data.UserID, ctx)
+				if err != nil {
+					logger.PrintLog(logger.ERROR, err.Error())
+				}
+			}
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+	}()
+}
+
+func explodeURLs(data string) ([]string, error) {
+	var out []string
+	err := json.Unmarshal([]byte(data), &out)
+	if err != nil {
+		return make([]string, 0), err
+	}
+	return out, nil
+}
+
+func batchUpdate(data []string, userID int, ctx context.Context) error {
+	connection := db.GetDB()
+	if connection == nil {
+		return errors.New("connection to DB not found")
+	}
+
+	batch := pgx.Batch{}
+	for i, uid := range data {
+		fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
+		batch.Queue(updateRow, uid, strconv.Itoa(userID))
+	}
+	br := connection.SendBatch(ctx, &batch)
+	defer br.Close()
+	_, err := br.Exec()
+
+	var pgErr *pgconn.PgError
+	errors.As(err, &pgErr)
+
+	return err
 }

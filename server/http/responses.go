@@ -79,3 +79,11 @@ func NoContent(w http.ResponseWriter, addData Additional) {
 func Unauthorized(w http.ResponseWriter, addData Additional) {
 	successAnswerJSON(w, http.StatusUnauthorized, addData)
 }
+
+func Accepted(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusAccepted, addData)
+}
+
+func Gone(w http.ResponseWriter, addData Additional) {
+	successAnswerJSON(w, http.StatusGone, addData)
+}

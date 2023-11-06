@@ -62,6 +62,7 @@ func main() {
 		newServ.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)
 			r.Get(`/api/user/{query}`, newServ.HandleAPI)
+			r.Delete(`/api/user/{query}`, newServ.HandleAPI)
 		})
 	})
 

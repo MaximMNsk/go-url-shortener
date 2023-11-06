@@ -12,21 +12,23 @@ import (
 )
 
 type MemStorage struct {
-	Link      string `json:"original_url"`
-	ShortLink string `json:"short_url"`
-	ID        string `json:"correlation_id"`
-	Ctx       context.Context
-	Storage   memoryStorage.Storage
+	Link        string `json:"original_url"`
+	ShortLink   string `json:"short_url"`
+	ID          string `json:"correlation_id"`
+	DeletedFlag bool   `json:"is_deleted"`
+	Ctx         context.Context
+	Storage     memoryStorage.Storage
 }
 
-func (jsonData *MemStorage) Init(link, shortLink, id string, ctx context.Context) {
+func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
+	jsonData.DeletedFlag = isDeleted
 }
 
-func (jsonData *MemStorage) Get() (string, error) {
+func (jsonData *MemStorage) Get() (string, bool, error) {
 
 	logger.PrintLog(logger.INFO, "Get from memory")
 
@@ -37,15 +39,15 @@ func (jsonData *MemStorage) Get() (string, error) {
 	storageData := jsonData.Storage.Get()
 
 	if len(storageData) == 0 {
-		return "", errors.New("data not found")
+		return "", false, errors.New("data not found")
 	}
 
 	for _, v := range storageData {
 		if v.ID == jsonData.ID || v.Link == jsonData.Link {
-			return v.Link, nil
+			return v.Link, v.DeletedFlag, nil
 		}
 	}
-	return "", errors.New("data not found")
+	return "", false, errors.New("data not found")
 }
 
 func (jsonData *MemStorage) Set() error {
@@ -67,9 +69,10 @@ func (jsonData *MemStorage) Set() error {
 	}
 
 	var toStore = memoryStorage.StorageItem{
-		Link:      jsonData.Link,
-		ShortLink: jsonData.ShortLink,
-		ID:        jsonData.ID,
+		Link:        jsonData.Link,
+		ShortLink:   jsonData.ShortLink,
+		ID:          jsonData.ID,
+		DeletedFlag: jsonData.DeletedFlag,
 	}
 	jsonData.Storage.Set(toStore)
 
@@ -100,9 +103,10 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 		savingData[i].ShortLink = shortLink
 		//storage[savingData[i].ID] = savingData[i]
 		var toStore = memoryStorage.StorageItem{
-			Link:      savingData[i].Link,
-			ShortLink: shortLink,
-			ID:        savingData[i].ID,
+			Link:        savingData[i].Link,
+			ShortLink:   shortLink,
+			ID:          savingData[i].ID,
+			DeletedFlag: savingData[i].DeletedFlag,
 		}
 		jsonData.Storage.Set(toStore)
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
@@ -135,4 +139,8 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 		return JSONResp, err
 	}
 	return nil, nil
+}
+
+func (jsonData *MemStorage) HandleUserUrlsDelete() error {
+	return nil
 }

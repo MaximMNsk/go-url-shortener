@@ -14,44 +14,47 @@ import (
 )
 
 type FileStorage struct {
-	Link      string `json:"original_url"`
-	ShortLink string `json:"short_url"`
-	ID        string `json:"correlation_id"`
-	Ctx       context.Context
+	Link        string `json:"original_url"`
+	ShortLink   string `json:"short_url"`
+	ID          string `json:"correlation_id"`
+	DeletedFlag bool   `json:"is_deleted"`
+	Ctx         context.Context
 }
 
-func (jsonData *FileStorage) Init(link, shortLink, id string, ctx context.Context) {
+func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
+	jsonData.DeletedFlag = isDeleted
 }
 
 type inputOutputData struct {
-	Link      string `json:"original_url"`
-	ShortLink string `json:"short_url"`
-	ID        string `json:"correlation_id"`
+	Link        string `json:"original_url"`
+	ShortLink   string `json:"short_url"`
+	ID          string `json:"correlation_id"`
+	DeletedFlag bool   `json:"is_deleted"`
 }
 
-func (jsonData *FileStorage) Get() (string, error) {
+func (jsonData *FileStorage) Get() (string, bool, error) {
 
 	fileName := confModule.Config.Final.LinkFile
 	logger.PrintLog(logger.INFO, "Get from file: "+fileName)
 	var savedData []inputOutputData
 	jsonString, err := getData(fileName)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	err = json.Unmarshal([]byte(jsonString), &savedData)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	for _, v := range savedData {
 		if v.ID == jsonData.ID || v.Link == jsonData.Link {
-			return v.Link, nil
+			return v.Link, v.DeletedFlag, nil
 		}
 	}
-	return "", errors.New("no data found")
+	return "", false, errors.New("no data found")
 }
 
 func getData(fileName string) (string, error) {
@@ -100,9 +103,10 @@ func (jsonData *FileStorage) Set() error {
 	var savedData []inputOutputData
 
 	preparedData := inputOutputData{
-		Link:      jsonData.Link,
-		ShortLink: jsonData.ShortLink,
-		ID:        jsonData.ID,
+		Link:        jsonData.Link,
+		ShortLink:   jsonData.ShortLink,
+		ID:          jsonData.ID,
+		DeletedFlag: jsonData.DeletedFlag,
 	}
 
 	jsonString, err := getData(fileName)
@@ -272,4 +276,8 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 		return content, nil
 	}
 	return nil, nil
+}
+
+func (jsonData *FileStorage) HandleUserUrlsDelete() error {
+	return nil
 }

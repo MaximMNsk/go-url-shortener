@@ -25,12 +25,17 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	// Пришел ид
 	requestID := req.URL.Path[1:]
 
-	s.Storage.Init(``, ``, requestID, req.Context())
-	saved, err := s.Storage.Get()
+	s.Storage.Init(``, ``, requestID, false, req.Context())
+	saved, deleted, err := s.Storage.Get()
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Get exception: "+err.Error())
 		httpResp.BadRequest(res)
 		return
+	}
+
+	if deleted {
+		logger.PrintLog(logger.INFO, "Current item was deleted")
+		httpResp.Gone(res, httpResp.Additional{})
 	}
 
 	if saved != "" {
@@ -71,7 +76,7 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		InnerData: shortLink,
 	}
 
-	s.Storage.Init(string(contentBody), shortLink, linkID, req.Context())
+	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context())
 	err := s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -121,15 +126,33 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if ctrl == `urls` {
+	if ctrl == `urls` && req.Method == `GET` {
 		HandleAPIUserUrls(res, req, s)
+		return
+	}
+	if ctrl == `urls` && req.Method == `DELETE` {
+		HandleAPIUserUrlsDelete(res, req, s)
 		return
 	}
 }
 
+func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Server) {
+	contentBody, errBody := io.ReadAll(req.Body)
+	defer req.Body.Close()
+	if errBody != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	httpResp.Accepted(res, httpResp.Additional{})
+
+	_ = s.Storage.HandleUserUrlsDelete()
+	return
+}
+
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
-	s.Storage.Init(``, ``, ``, req.Context())
+	s.Storage.Init(``, ``, ``, false, req.Context())
 	byteRes, err := s.Storage.HandleUserUrls()
 
 	if err != nil {
@@ -158,7 +181,7 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	s.Storage.Init(string(contentBody), ``, ``, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
 	resData, err := s.Storage.BatchSet()
 
 	var batchErr *pgconn.PgError
@@ -222,7 +245,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, req.Context())
+	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context())
 	err = s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -263,7 +286,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		if req.Method == "GET" || req.Method == "POST" {
+		if req.Method == "GET" || req.Method == "POST" || req.Method == "DELETE" {
 			next.ServeHTTP(res, req)
 		} else {
 			httpResp.BadRequest(res)

@@ -58,14 +58,14 @@ func AuthChecker(next http.Handler) http.Handler {
 			logger.PrintLog(logger.DEBUG, `Present userID: `+strconv.Itoa(UserID))
 			if UserID > 0 {
 				userNumber := UserNum(`UserID`)
-				ctx := context.WithValue(r.Context(), userNumber, int(UserID))
+				ctx := context.WithValue(r.Context(), userNumber, UserID)
 				newReqCtx := r.WithContext(ctx)
 				next.ServeHTTP(w, newReqCtx)
 				return
 			}
 		}
 		additional := httpResp.Additional{}
-		httpResp.NoContent(w, additional)
+		httpResp.Unauthorized(w, additional)
 	})
 }
 
