@@ -129,7 +129,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 				ShortLink: tt.fields.ShortLink,
 				ID:        tt.fields.ID,
 			}
-			link, _ := jsonData.Get()
+			link, _, _ := jsonData.Get()
 			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}

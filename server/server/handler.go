@@ -147,7 +147,6 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	httpResp.Accepted(res, httpResp.Additional{})
 
 	_ = s.Storage.HandleUserUrlsDelete()
-	return
 }
 
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
