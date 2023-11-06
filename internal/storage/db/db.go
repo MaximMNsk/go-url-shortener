@@ -31,7 +31,6 @@ func GetCtx() context.Context {
 	return ctx
 }
 
-func Close() error {
+func Close() {
 	DB.Close()
-	return nil
 }

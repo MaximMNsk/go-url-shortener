@@ -271,9 +271,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 	if db.GetDB() == nil {
 		err := db.Connect()
-		defer func() {
-			_ = db.Close()
-		}()
+		db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, err.Error())
 			httpResp.InternalError(res)

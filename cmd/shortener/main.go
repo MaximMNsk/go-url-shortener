@@ -29,16 +29,11 @@ func main() {
 
 	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
 		err := db.Connect()
+		defer db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Failed connect to DB")
 		}
 		database.PrepareDB(db.GetDB())
-		defer func() {
-			err := db.Close()
-			if err != nil {
-				logger.PrintLog(logger.ERROR, "Failed close connection to DB")
-			}
-		}()
 	}
 
 	storage := server.InitStorage()
