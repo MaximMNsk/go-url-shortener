@@ -104,10 +104,17 @@ func getData(data DBStorage) (DBStorage, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
+	defer mx.Unlock()
 
 	ctx := data.Ctx
 	selected := DBStorage{}
 	connection := db.GetDB()
+	acquire, err := connection.Acquire(ctx)
+	if err != nil {
+		return DBStorage{}, err
+	}
+	defer acquire.Release()
+
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
@@ -116,14 +123,14 @@ func getData(data DBStorage) (DBStorage, error) {
 	//row := connection.QueryRow(ctx, query, data.ID, data.Link, strconv.Itoa(userID.(int)))
 	//if userID == `` || userID == nil {
 	query := selectRow
-	row := connection.QueryRow(ctx, query, data.ID, data.Link)
+	row := acquire.QueryRow(ctx, query, data.ID, data.Link)
 	//}
 
-	err := row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
+	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
-	mx.Unlock()
+
 	return selected, nil
 }
 
@@ -143,6 +150,7 @@ func saveData(data DBStorage) (DBStorage, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
+	defer mx.Unlock()
 
 	ctx := data.Ctx
 	connection := db.GetDB()
@@ -150,9 +158,15 @@ func saveData(data DBStorage) (DBStorage, error) {
 		return DBStorage{}, errors.New("connection to DB not found")
 	}
 
+	acquire, err := connection.Acquire(ctx)
+	if err != nil {
+		return DBStorage{}, err
+	}
+	defer acquire.Release()
+
 	userID := ctx.Value(cookie.UserNum(`UserID`))
 
-	_, err := connection.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
+	_, err = acquire.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
@@ -161,7 +175,6 @@ func saveData(data DBStorage) (DBStorage, error) {
 		return data, pgErr
 	}
 
-	mx.Unlock()
 	return data, nil
 }
 
@@ -174,13 +187,13 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
+	defer mx.Unlock()
 
 	var savingData []DBStorage
 	var outputData []outputBatch
 
 	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
-		mx.Unlock()
 		return nil, err
 	}
 
@@ -199,15 +212,20 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	///////// Current logic
 	connection := db.GetDB()
 	if connection == nil {
-		mx.Unlock()
 		return nil, errors.New("connection to DB not found")
 	}
+
+	acquire, err := connection.Acquire(jsonData.Ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer acquire.Release()
 
 	batch := pgx.Batch{}
 	for _, v := range savingData {
 		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID.(string))
 	}
-	br := connection.SendBatch(jsonData.Ctx, &batch)
+	br := acquire.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
 	_, err = br.Exec()
 
@@ -218,14 +236,12 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
 		logger.PrintLog(logger.WARN, err.Error())
-		mx.Unlock()
 		return nil, err
 	}
 	if pgErr != nil {
 		return JSONResp, pgErr
 	}
 
-	mx.Unlock()
 	return JSONResp, nil
 }
 
@@ -241,9 +257,15 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 		return nil, errors.New("connection to DB not found")
 	}
 
+	acquire, err := connection.Acquire(jsonData.Ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer acquire.Release()
+
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
-	rows, err := connection.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
+	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
@@ -334,24 +356,30 @@ func batchUpdate(data []string, userID int, ctx context.Context) error {
 
 	var mx sync.Mutex
 	mx.Lock()
+	defer mx.Unlock()
 
 	connection := db.GetDB()
 	if connection == nil {
 		return errors.New("connection to DB not found")
 	}
 
+	acquire, err := connection.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer acquire.Release()
+
 	batch := pgx.Batch{}
 	for i, uid := range data {
 		fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
 		batch.Queue(updateRow, uid, strconv.Itoa(userID))
 	}
-	br := connection.SendBatch(ctx, &batch)
+	br := acquire.SendBatch(ctx, &batch)
 	defer br.Close()
-	_, err := br.Exec()
+	_, err = br.Exec()
 
 	var pgErr *pgconn.PgError
 	errors.As(err, &pgErr)
 
-	mx.Unlock()
 	return err
 }
