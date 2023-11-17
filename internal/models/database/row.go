@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
@@ -13,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"math"
 	"strconv"
 	"sync"
 )
@@ -109,22 +107,18 @@ func getData(data DBStorage) (DBStorage, error) {
 	ctx := data.Ctx
 	selected := DBStorage{}
 	connection := db.GetDB()
+
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
-		return DBStorage{}, err
+		return selected, err
 	}
 	defer acquire.Release()
 
 	if connection == nil {
 		return selected, errors.New("connection to DB not found")
 	}
-	//userID := ctx.Value(cookie.UserNum(`UserID`))
-	//query := selectRowByUser
-	//row := connection.QueryRow(ctx, query, data.ID, data.Link, strconv.Itoa(userID.(int)))
-	//if userID == `` || userID == nil {
 	query := selectRow
 	row := acquire.QueryRow(ctx, query, data.ID, data.Link)
-	//}
 
 	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
@@ -221,7 +215,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	}
 	defer acquire.Release()
 
-	batch := pgx.Batch{}
+	var batch pgx.Batch
 	for _, v := range savingData {
 		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID.(string))
 	}
@@ -282,7 +276,7 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
-type input struct {
+type DeleteItem struct {
 	URLs   string
 	UserID int
 }
@@ -291,56 +285,57 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() error {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
 	doneCh := make(chan struct{})
 	defer close(doneCh)
-	maxWorkers := 1
 
-	inputData := input{
+	inputData := DeleteItem{
 		URLs:   jsonData.Link,
 		UserID: userID,
 	}
 
-	update(doneCh, inputData, maxWorkers, jsonData.Ctx)
+	cn = make(chan DeleteItem)
+	cn <- inputData
+	close(cn)
+	//cn = append(cn, cnl)
 
 	return nil
 }
 
-func update(doneCh chan struct{}, data input, countWorkers int, ctx context.Context) {
-	var wg sync.WaitGroup
+var cn chan DeleteItem
 
-	explodedData, err := explodeURLs(data.URLs)
-	if err != nil {
-		logger.PrintLog(logger.FATAL, err.Error())
-		return
-	}
-	inputLen := len(explodedData)
-	partLen := int(math.Ceil(float64(inputLen) / float64(countWorkers)))
+func GetChannel() chan DeleteItem {
+	return cn
+}
 
-	for i := 0; i < countWorkers; i++ {
-		wg.Add(1)
-		start := i * partLen
-		end := (i + 1) * partLen
-		if i+1 == countWorkers {
-			end = inputLen
+func AsyncSaver() {
+
+	logger.PrintLog(logger.INFO, "Starting async saver")
+	for {
+		if GetChannel() == nil {
+			//time.Sleep(1 * time.Second)
+			//fmt.Println(`Null channel`)
+			continue
 		}
-		chunk := explodedData[start:end]
-
-		go func() {
-			defer wg.Done()
-
+		//for _, ch := range GetChannels() {
+	Loop:
+		for {
 			select {
-			case <-doneCh:
-				return
-			default:
-				err := batchUpdate(chunk, data.UserID, ctx)
+			case inp, ok := <-GetChannel():
+				if !ok {
+					//time.Sleep(1 * time.Second)
+					//fmt.Println(`Empty channel`)
+					break Loop
+				}
+				links, err := explodeURLs(inp.URLs)
 				if err != nil {
-					logger.PrintLog(logger.ERROR, err.Error())
+					continue
+				}
+				err = batchUpdate(links, inp.UserID)
+				if err != nil {
+					continue
 				}
 			}
-		}()
+		}
+		//}
 	}
-
-	go func() {
-		wg.Wait()
-	}()
 }
 
 func explodeURLs(data string) ([]string, error) {
@@ -349,16 +344,25 @@ func explodeURLs(data string) ([]string, error) {
 	if err != nil {
 		return make([]string, 0), err
 	}
-	return out, nil
+	var uniqueResult = make(map[string]bool)
+	for _, v := range out {
+		uniqueResult[v] = false
+	}
+	var result = make([]string, 0)
+	for z, _ := range uniqueResult {
+		result = append(result, z)
+	}
+	return result, nil
 }
 
-func batchUpdate(data []string, userID int, ctx context.Context) error {
+func batchUpdate(data []string, userID int) error {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
 
 	connection := db.GetDB()
+	ctx := db.GetCtx()
 	if connection == nil {
 		return errors.New("connection to DB not found")
 	}
@@ -369,11 +373,12 @@ func batchUpdate(data []string, userID int, ctx context.Context) error {
 	}
 	defer acquire.Release()
 
-	batch := pgx.Batch{}
-	for i, uid := range data {
-		fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
+	var batch pgx.Batch
+	for _, uid := range data {
+		//fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
 		batch.Queue(updateRow, uid, strconv.Itoa(userID))
 	}
+
 	br := acquire.SendBatch(ctx, &batch)
 	defer br.Close()
 	_, err = br.Exec()

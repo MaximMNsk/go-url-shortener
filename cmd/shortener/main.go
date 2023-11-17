@@ -28,7 +28,7 @@ func main() {
 	}
 
 	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
-		err := db.Connect()
+		err = db.Connect()
 		defer db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Failed connect to DB")
@@ -62,7 +62,6 @@ func main() {
 	})
 
 	logger.PrintLog(logger.INFO, "Starting newServ")
-
 	err = http.ListenAndServe(confModule.Config.Final.AppAddr, newServ.Routers)
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't start newServ. "+err.Error())

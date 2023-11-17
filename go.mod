@@ -8,6 +8,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/golang/mock v1.6.0
 	github.com/jackc/pgx/v5 v5.4.3
+	github.com/mpvl/unique v0.0.0-20150818121801-cbe035fff7de
 	github.com/rs/zerolog v1.30.0
 	github.com/stretchr/testify v1.8.4
 )

@@ -143,9 +143,9 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 		httpResp.BadRequest(res)
 		return
 	}
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
 	httpResp.Accepted(res, httpResp.Additional{})
 
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
 	_ = s.Storage.HandleUserUrlsDelete()
 }
 
@@ -299,6 +299,7 @@ func InitStorage() model.Storable {
 	var storage model.Storable
 	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
 		storage = &database.DBStorage{}
+		go database.AsyncSaver()
 		return storage
 	}
 	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
