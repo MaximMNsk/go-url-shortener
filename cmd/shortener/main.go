@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
@@ -22,22 +23,24 @@ func main() {
 	logger.PrintLog(logger.INFO, "Start newServ")
 	logger.PrintLog(logger.INFO, "Handle config")
 
+	ctx := context.Background()
+
 	conf, err := confModule.HandleConfig()
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
 	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
-		err = db.Connect()
+		err = db.Connect(ctx)
 		defer db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Failed connect to DB")
 		}
-		database.PrepareDB(db.GetDB())
+		database.PrepareDB(db.GetDB(), ctx)
 	}
 
 	storage := server.InitStorage()
-	newServ := server.NewServ(conf, storage)
+	newServ := server.NewServ(conf, storage, ctx)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 
