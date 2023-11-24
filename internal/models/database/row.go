@@ -403,7 +403,7 @@ func explodeURLs(data string) ([]string, error) {
 		uniqueResult[v] = false
 	}
 	var result = make([]string, 0)
-	for z, _ := range uniqueResult {
+	for z := range uniqueResult {
 		result = append(result, z)
 	}
 	return result, nil

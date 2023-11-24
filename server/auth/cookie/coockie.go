@@ -46,7 +46,6 @@ func AuthSetter(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), userNumber, strconv.Itoa(UserID))
 		newReqCtx := r.WithContext(ctx)
 		next.ServeHTTP(w, newReqCtx)
-		return
 	})
 }
 
@@ -70,7 +69,6 @@ func AuthChecker(next http.Handler) http.Handler {
 		}
 		additional := httpResp.Additional{}
 		httpResp.Unauthorized(w, additional)
-		return
 	})
 }
 

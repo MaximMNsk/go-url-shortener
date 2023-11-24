@@ -17,7 +17,10 @@ func Connect(ctx context.Context) error {
 	//ctx = context.Background()
 	logger.PrintLog(logger.INFO, config.Config.Final.DB)
 	cfg, err := pgxpool.ParseConfig(config.Config.Final.DB)
-	cfg.MaxConns = 1600
+	if err != nil {
+		logger.PrintLog(logger.ERROR, `Can not parse config to DB. Connection failed`)
+	}
+	cfg.MaxConns = 16
 	cfg.MinConns = 1
 	cfg.HealthCheckPeriod = 1 * time.Minute
 	cfg.MaxConnLifetime = 1 * time.Hour
