@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/interface/model"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
@@ -25,11 +27,19 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	// Пришел ид
 	requestID := req.URL.Path[1:]
 
-	s.Storage.Init(``, ``, requestID, req.Context())
-	saved, err := s.Storage.Get()
+	s.Storage.Init(``, ``, requestID, false, req.Context())
+	saved, deleted, err := s.Storage.Get()
+	// 400
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Get exception: "+err.Error())
 		httpResp.BadRequest(res)
+		return
+	}
+
+	// 410
+	if deleted {
+		logger.PrintLog(logger.INFO, "Current item was deleted")
+		httpResp.Gone(res, httpResp.Additional{})
 		return
 	}
 
@@ -71,7 +81,7 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		InnerData: shortLink,
 	}
 
-	s.Storage.Init(string(contentBody), shortLink, linkID, req.Context())
+	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context())
 	err := s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -104,6 +114,7 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 	availableCurls := make(controllers)
 	availableCurls["shorten"] = true
 	availableCurls["batch"] = true
+	availableCurls["urls"] = true
 
 	if !availableCurls[ctrl] {
 		httpResp.BadRequest(res)
@@ -119,6 +130,51 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 		HandleAPIBatch(res, req, s)
 		return
 	}
+
+	if ctrl == `urls` && req.Method == `GET` {
+		HandleAPIUserUrls(res, req, s)
+		return
+	}
+	if ctrl == `urls` && req.Method == `DELETE` {
+		HandleAPIUserUrlsDelete(res, req, s)
+		return
+	}
+}
+
+func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Server) {
+	contentBody, errBody := io.ReadAll(req.Body)
+	defer req.Body.Close()
+	if errBody != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+	httpResp.Accepted(res, httpResp.Additional{})
+
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	s.Storage.HandleUserUrlsDelete()
+}
+
+func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
+
+	s.Storage.Init(``, ``, ``, false, req.Context())
+	byteRes, err := s.Storage.HandleUserUrls()
+
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
+	if byteRes == nil {
+		fmt.Println(byteRes)
+		httpResp.NoContent(res, httpResp.Additional{})
+		return
+	}
+
+	additional := httpResp.Additional{
+		Place:     "body",
+		InnerData: string(byteRes),
+	}
+	httpResp.OkAdditionalJSON(res, additional)
 }
 
 func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
@@ -130,7 +186,7 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	s.Storage.Init(string(contentBody), ``, ``, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
 	resData, err := s.Storage.BatchSet()
 
 	var batchErr *pgconn.PgError
@@ -194,7 +250,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, req.Context())
+	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context())
 	err = s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -220,10 +276,8 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 	if db.GetDB() == nil {
-		err := db.Connect()
-		defer func() {
-			_ = db.Close()
-		}()
+		err := db.Connect(s.Context)
+		db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, err.Error())
 			httpResp.InternalError(res)
@@ -235,10 +289,11 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		if req.Method == "GET" || req.Method == "POST" {
+		if req.Method == "GET" || req.Method == "POST" || req.Method == "DELETE" {
 			next.ServeHTTP(res, req)
 		} else {
 			httpResp.BadRequest(res)
+			return
 		}
 	})
 }
@@ -251,6 +306,8 @@ func InitStorage() model.Storable {
 	var storage model.Storable
 	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
 		storage = &database.DBStorage{}
+		//go database.AsyncSaver()
+		go storage.AsyncSaver()
 		return storage
 	}
 	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
@@ -271,8 +328,9 @@ type Server struct {
 	Storage model.Storable
 	Routers chi.Router
 	Config  confModule.OuterConfig
+	Context context.Context
 }
 
-func NewServ(c confModule.OuterConfig, s model.Storable) Server {
-	return Server{Storage: s, Config: c}
+func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
+	return Server{Storage: s, Config: c, Context: ctx}
 }

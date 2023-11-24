@@ -1,9 +1,10 @@
 package memorystorage
 
 type StorageItem struct {
-	Link      string
-	ShortLink string
-	ID        string
+	Link        string
+	ShortLink   string
+	ID          string
+	DeletedFlag bool
 }
 
 type Storage struct {
