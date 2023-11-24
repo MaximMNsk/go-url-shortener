@@ -141,6 +141,7 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
-func (jsonData *MemStorage) HandleUserUrlsDelete() error {
-	return nil
+func (jsonData *MemStorage) HandleUserUrlsDelete() {
+}
+func (jsonData *MemStorage) AsyncSaver() {
 }

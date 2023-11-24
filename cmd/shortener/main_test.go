@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,7 @@ func Test_handleMainPage(t *testing.T) {
 	var shortLink string
 	config, _ := confModule.HandleConfig()
 	storage := server.InitStorage()
-	serve := server.NewServ(config, storage)
+	serve := server.NewServ(config, storage, context.Background())
 
 	for _, tt := range tests {
 

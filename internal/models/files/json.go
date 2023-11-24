@@ -278,6 +278,8 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
-func (jsonData *FileStorage) HandleUserUrlsDelete() error {
-	return nil
+func (jsonData *FileStorage) HandleUserUrlsDelete() {
+}
+
+func (jsonData *FileStorage) AsyncSaver() {
 }

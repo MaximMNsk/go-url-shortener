@@ -1,8 +1,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/interface/model"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
@@ -27,15 +29,18 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 
 	s.Storage.Init(``, ``, requestID, false, req.Context())
 	saved, deleted, err := s.Storage.Get()
+	// 400
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Get exception: "+err.Error())
 		httpResp.BadRequest(res)
 		return
 	}
 
+	// 410
 	if deleted {
 		logger.PrintLog(logger.INFO, "Current item was deleted")
 		httpResp.Gone(res, httpResp.Additional{})
+		return
 	}
 
 	if saved != "" {
@@ -146,7 +151,7 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	httpResp.Accepted(res, httpResp.Additional{})
 
 	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
-	_ = s.Storage.HandleUserUrlsDelete()
+	s.Storage.HandleUserUrlsDelete()
 }
 
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
@@ -160,6 +165,7 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 	}
 
 	if byteRes == nil {
+		fmt.Println(byteRes)
 		httpResp.NoContent(res, httpResp.Additional{})
 		return
 	}
@@ -270,7 +276,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 	if db.GetDB() == nil {
-		err := db.Connect()
+		err := db.Connect(s.Context)
 		db.Close()
 		if err != nil {
 			logger.PrintLog(logger.ERROR, err.Error())
@@ -287,6 +293,7 @@ func HandleOther(next http.Handler) http.Handler {
 			next.ServeHTTP(res, req)
 		} else {
 			httpResp.BadRequest(res)
+			return
 		}
 	})
 }
@@ -299,7 +306,8 @@ func InitStorage() model.Storable {
 	var storage model.Storable
 	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
 		storage = &database.DBStorage{}
-		go database.AsyncSaver()
+		//go database.AsyncSaver()
+		go storage.AsyncSaver()
 		return storage
 	}
 	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
@@ -320,8 +328,9 @@ type Server struct {
 	Storage model.Storable
 	Routers chi.Router
 	Config  confModule.OuterConfig
+	Context context.Context
 }
 
-func NewServ(c confModule.OuterConfig, s model.Storable) Server {
-	return Server{Storage: s, Config: c}
+func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
+	return Server{Storage: s, Config: c, Context: ctx}
 }

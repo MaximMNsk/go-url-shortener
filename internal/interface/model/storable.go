@@ -8,5 +8,6 @@ type Storable interface {
 	Set() error
 	BatchSet() ([]byte, error)
 	HandleUserUrls() ([]byte, error)
-	HandleUserUrlsDelete() error
+	HandleUserUrlsDelete()
+	AsyncSaver()
 }
