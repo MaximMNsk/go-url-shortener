@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
@@ -14,26 +13,25 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
-	"sync"
-	"time"
 )
 
 type DBStorage struct {
-	Link        string `json:"original_url"`
-	ShortLink   string `json:"short_url"`
-	ID          string `json:"correlation_id"`
-	DeletedFlag bool   `json:"is_deleted"`
-	ToDeleteCh  chan DeleteItem
-	Ctx         context.Context
+	Ctx            context.Context
+	Link           string `json:"original_url"`
+	ShortLink      string `json:"short_url"`
+	ID             string `json:"correlation_id"`
+	DeletedFlag    bool   `json:"is_deleted"`
+	ToDeleteCh     chan DeleteItem
+	ConnectionPool *pgxpool.Pool
 }
 
-func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
+func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, pool *pgxpool.Pool) {
+	jsonData.Ctx = ctx
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
-	jsonData.Ctx = ctx
 	jsonData.DeletedFlag = isDeleted
-	jsonData.ToDeleteCh = make(chan DeleteItem, 100)
+	jsonData.ConnectionPool = pool
 }
 
 const createSchemaQuery = `
@@ -74,6 +72,9 @@ select original_url, short_url from shortener.short_links where user_id = $1`
 const updateRow = `
 update shortener.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
+const updateRowNoUser = `
+update shortener.short_links set is_deleted = true where uid = $1`
+
 func PrepareDB(connect *pgxpool.Pool, ctx context.Context) {
 	_, err := connect.Exec(ctx, createSchemaQuery)
 	if err != nil {
@@ -94,6 +95,18 @@ func PrepareDB(connect *pgxpool.Pool, ctx context.Context) {
 	}
 }
 
+func (jsonData *DBStorage) Ping() bool {
+	ctx := jsonData.Ctx
+	connection := jsonData.ConnectionPool
+
+	err := connection.Ping(ctx)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, err.Error())
+		return false
+	}
+	return true
+}
+
 func (jsonData *DBStorage) Get() (string, bool, error) {
 
 	logger.PrintLog(logger.INFO, "Get from database")
@@ -104,13 +117,16 @@ func (jsonData *DBStorage) Get() (string, bool, error) {
 
 func getData(data DBStorage) (DBStorage, error) {
 
-	var mx sync.Mutex
-	mx.Lock()
-	defer mx.Unlock()
+	//var mx sync.Mutex
+	//mx.Lock()
+	//defer mx.Unlock()
 
 	ctx := data.Ctx
+	//ctx := context.Background()
 	var selected DBStorage
-	connection := db.GetDB()
+	connection := data.ConnectionPool
+
+	userID := ctx.Value(cookie.UserNum(`UserID`))
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
@@ -126,6 +142,8 @@ func getData(data DBStorage) (DBStorage, error) {
 
 	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
+		fmt.Println(`userID`, userID)
+		fmt.Println(`short`, data.ID)
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 		errData := fmt.Sprintf("ID: %s, Link: %s, ShortLink: %s, DeletedFlag: %v", selected.ID, selected.Link, selected.ShortLink, selected.DeletedFlag)
 		logger.PrintLog(logger.WARN, "Select content: "+errData)
@@ -148,12 +166,12 @@ func (jsonData *DBStorage) Set() error {
 
 func saveData(data DBStorage) (DBStorage, error) {
 
-	var mx sync.Mutex
-	mx.Lock()
-	defer mx.Unlock()
+	//var mx sync.Mutex
+	//mx.Lock()
+	//defer mx.Unlock()
 
 	ctx := data.Ctx
-	connection := db.GetDB()
+	connection := data.ConnectionPool
 	if connection == nil {
 		return DBStorage{}, errors.New("connection to DB not found")
 	}
@@ -185,9 +203,9 @@ type outputBatch struct {
 
 func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
-	var mx sync.Mutex
-	mx.Lock()
-	defer mx.Unlock()
+	//var mx sync.Mutex
+	//mx.Lock()
+	//defer mx.Unlock()
 
 	var savingData []DBStorage
 	var outputData []outputBatch
@@ -210,7 +228,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
 	///////// Current logic
-	connection := db.GetDB()
+	connection := jsonData.ConnectionPool
 	if connection == nil {
 		return nil, errors.New("connection to DB not found")
 	}
@@ -252,12 +270,15 @@ type JSONCutted struct {
 
 func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	var batchResp []JSONCutted
-	connection := db.GetDB()
+	connection := jsonData.ConnectionPool
 	if connection == nil {
 		return nil, errors.New("connection to DB not found")
 	}
 
-	acquire, err := connection.Acquire(jsonData.Ctx)
+	ctx := jsonData.Ctx
+	//ctx := context.Background()
+
+	acquire, err := connection.Acquire(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -290,10 +311,12 @@ type DeleteItem struct {
 	UserID int
 }
 
+var ToDeleteCh chan DeleteItem
+
 func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
-	doneCh := make(chan struct{})
-	defer close(doneCh)
+	//doneCh := make(chan struct{})
+	//defer close(doneCh)
 
 	inputData := DeleteItem{
 		URLs:   jsonData.Link,
@@ -301,96 +324,40 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	}
 
 	go func() {
-		jsonData.ToDeleteCh <- inputData
-		fmt.Println(`Data sent`)
+		ToDeleteCh <- inputData
+		//fmt.Println(`Data sent`)
 	}()
 }
 
 func (jsonData *DBStorage) AsyncSaver() {
+	ToDeleteCh = make(chan DeleteItem)
+
 	for {
 		//fmt.Println(jsonData.ToDeleteChs)
-		if jsonData.ToDeleteCh == nil {
-			fmt.Println(`Nil channel`)
-			time.Sleep(1 * time.Second)
+		if ToDeleteCh == nil {
+			//fmt.Println(`Nil channel`)
+			//time.Sleep(1 * time.Second)
 			continue
 		}
 		select {
-		case data, ok := <-jsonData.ToDeleteCh:
+		case data, ok := <-ToDeleteCh:
 			if !ok {
 				fmt.Println(`!ok`)
 				continue
 			}
-			fmt.Println(`Save data:`)
+			fmt.Println(`Delete data:`)
 			fmt.Println(data)
-			err := batchUpdate(data.URLs, data.UserID)
+			err := batchUpdate(data.URLs, data.UserID, jsonData.ConnectionPool)
 			if err != nil {
-				fmt.Println(err)
+				fmt.Println(`Delete error:`, err)
 				continue
 			}
 		default:
-			fmt.Println(`Listen channel`)
+			//fmt.Println(`Listen channel`)
 		}
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 	}
 }
-
-//func createCh(data DeleteItem) chan DeleteItem {
-//	inputCh := make(chan DeleteItem, 1)
-//	inputCh <- data // Не работает, если не указана емкость канала!!!
-//	close(inputCh)
-//	return inputCh
-//}
-//
-//func (jsonData *DBStorage) AppendCh(data DeleteItem, wg *sync.WaitGroup) {
-//	inputCh := createCh(data)
-//	jsonData.ToDeleteChs = append(jsonData.ToDeleteChs, inputCh)
-//}
-
-//func (jsonData *DBStorage) AsyncSaverOld() {
-//	logger.PrintLog(logger.INFO, "Starting async saver")
-//	for {
-//		toDeleteChsCount := len(jsonData.ToDeleteChs)
-//		fmt.Println(`Count channels in slice: ` + strconv.Itoa(toDeleteChsCount))
-//		if toDeleteChsCount == 0 {
-//			time.Sleep(1 * time.Second)
-//			fmt.Println(`Empty slice. Retry...`)
-//			continue
-//		}
-//		fmt.Println(`Not empty slice:`)
-//		fmt.Println(jsonData.ToDeleteChs)
-//
-//		for i, ch := range jsonData.ToDeleteChs {
-//		Loop:
-//			for {
-//				fmt.Println(i)
-//				startLogWord := `Continue `
-//				if i == 0 {
-//					startLogWord = `Start `
-//				}
-//				fmt.Println(startLogWord + `iter not empty channel`)
-//				select {
-//				case inp, ok := <-ch:
-//					fmt.Println(inp)
-//					fmt.Println(ok)
-//					fmt.Println(jsonData.ToDeleteChs)
-//					emptyItem := DeleteItem{}
-//					if !ok || inp == emptyItem {
-//						fmt.Println(`!ok or empty Item. Exit iter channel`)
-//						break Loop
-//					}
-//					err := batchUpdate(inp.URLs, inp.UserID)
-//					jsonData.ToDeleteChs = jsonData.ToDeleteChs[i+1:]
-//					if err != nil {
-//						fmt.Println(err)
-//						continue
-//					}
-//				}
-//				time.Sleep(1 * time.Second)
-//			} // Loop
-//		}
-//
-//	}
-//}
 
 func explodeURLs(data string) ([]string, error) {
 	var out []string
@@ -409,18 +376,18 @@ func explodeURLs(data string) ([]string, error) {
 	return result, nil
 }
 
-func batchUpdate(links string, userID int) error {
+func batchUpdate(links string, userID int, pool *pgxpool.Pool) error {
 
-	var mx sync.Mutex
-	mx.Lock()
-	defer mx.Unlock()
+	//var mx sync.Mutex
+	//mx.Lock()
+	//defer mx.Unlock()
 
 	data, err := explodeURLs(links)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	connection := db.GetDB()
+	connection := pool
 	ctx := context.Background()
 	if connection == nil {
 		return errors.New("connection to DB not found")
@@ -435,7 +402,8 @@ func batchUpdate(links string, userID int) error {
 	var batch pgx.Batch
 	for _, uid := range data {
 		//fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
-		batch.Queue(updateRow, uid, strconv.Itoa(userID))
+		//batch.Queue(updateRow, uid, strconv.Itoa(userID))
+		batch.Queue(updateRowNoUser, uid)
 	}
 
 	br := acquire.SendBatch(ctx, &batch)

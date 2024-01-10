@@ -9,7 +9,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/memory"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	memoryStorage "github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
@@ -18,6 +17,7 @@ import (
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"net/http"
 )
@@ -27,7 +27,9 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	// Пришел ид
 	requestID := req.URL.Path[1:]
 
-	s.Storage.Init(``, ``, requestID, false, req.Context())
+	fmt.Println(`requestID`, requestID)
+
+	s.Storage.Init(``, ``, requestID, false, req.Context(), s.PgxPool)
 	saved, deleted, err := s.Storage.Get()
 	// 400
 	if err != nil {
@@ -81,7 +83,7 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		InnerData: shortLink,
 	}
 
-	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context())
+	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context(), s.PgxPool)
 	err := s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -93,13 +95,16 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 			httpResp.Conflict(res, additional)
 			return
 		}
-	}
-
-	if err != nil {
 		logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
-		httpResp.InternalError(res)
+		httpResp.BadRequest(res)
 		return
 	}
+
+	//if err != nil {
+	//	logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
+	//	httpResp.InternalError(res)
+	//	return
+	//}
 
 	// Отдаем 201 ответ с шортлинком
 	httpResp.Created(res, additional)
@@ -150,13 +155,13 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	}
 	httpResp.Accepted(res, httpResp.Additional{})
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.PgxPool)
 	s.Storage.HandleUserUrlsDelete()
 }
 
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
-	s.Storage.Init(``, ``, ``, false, req.Context())
+	s.Storage.Init(``, ``, ``, false, req.Context(), s.PgxPool)
 	byteRes, err := s.Storage.HandleUserUrls()
 
 	if err != nil {
@@ -186,7 +191,7 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.PgxPool)
 	resData, err := s.Storage.BatchSet()
 
 	var batchErr *pgconn.PgError
@@ -231,7 +236,8 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	var apiData input
 	err := json.Unmarshal(contentBody, &apiData)
 	if err != nil {
-		httpResp.InternalError(res)
+		//httpResp.InternalError(res)
+		httpResp.BadRequest(res)
 		return
 	}
 	linkID := sha1hash.Create(apiData.URL, 8)
@@ -242,7 +248,8 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	var JSONResp []byte
 	JSONResp, err = json.Marshal(resp)
 	if err != nil {
-		httpResp.InternalError(res)
+		//httpResp.InternalError(res)
+		httpResp.BadRequest(res)
 		return
 	}
 	additional := httpResp.Additional{
@@ -250,7 +257,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context())
+	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context(), s.PgxPool)
 	err = s.Storage.Set()
 
 	var pgErr *pgconn.PgError
@@ -262,29 +269,28 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 			httpResp.ConflictJSON(res, additional)
 			return
 		}
-	}
-
-	if err != nil {
-		httpResp.InternalError(res)
+		logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
+		httpResp.BadRequest(res)
 		return
 	}
+	//
+	//if err != nil {
+	//	httpResp.InternalError(res)
+	//	return
+	//}
 
 	// Отдаем 201 ответ с шортлинком
 	httpResp.CreatedJSON(res, additional)
 }
 
 func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
-
-	if db.GetDB() == nil {
-		err := db.Connect(s.Context)
-		db.Close()
-		if err != nil {
-			logger.PrintLog(logger.ERROR, err.Error())
-			httpResp.InternalError(res)
-			return
-		}
+	s.Storage.Init(``, ``, ``, false, req.Context(), s.PgxPool)
+	ok := s.Storage.Ping()
+	if ok {
+		httpResp.Ok(res)
+		return
 	}
-	httpResp.Ok(res)
+	httpResp.InternalError(res)
 }
 
 func HandleOther(next http.Handler) http.Handler {
@@ -302,11 +308,10 @@ func HandleOther(next http.Handler) http.Handler {
  * Executor
  */
 
-func InitStorage() model.Storable {
+func ChooseStorage() model.Storable {
 	var storage model.Storable
 	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
 		storage = &database.DBStorage{}
-		//go database.AsyncSaver()
 		go storage.AsyncSaver()
 		return storage
 	}
@@ -329,8 +334,9 @@ type Server struct {
 	Routers chi.Router
 	Config  confModule.OuterConfig
 	Context context.Context
+	PgxPool *pgxpool.Pool
 }
 
-func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
-	return Server{Storage: s, Config: c, Context: ctx}
+func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context, pgp *pgxpool.Pool) Server {
+	return Server{Storage: s, Config: c, Context: ctx, PgxPool: pgp}
 }

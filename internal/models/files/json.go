@@ -7,6 +7,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,12 +22,16 @@ type FileStorage struct {
 	Ctx         context.Context
 }
 
-func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
+func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, pool *pgxpool.Pool) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
 	jsonData.DeletedFlag = isDeleted
+}
+
+func (jsonData *FileStorage) Ping() bool {
+	return true
 }
 
 type inputOutputData struct {

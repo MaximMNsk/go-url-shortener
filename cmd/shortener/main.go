@@ -11,6 +11,7 @@ import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 )
 
@@ -30,17 +31,17 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
+	var pgPool *pgxpool.Pool
+	storage := server.ChooseStorage()
 	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
-		err = db.Connect(ctx)
-		defer db.Close()
+		pgPool, err = db.Connect(ctx)
+		defer db.Close(pgPool)
 		if err != nil {
 			logger.PrintLog(logger.ERROR, "Failed connect to DB")
 		}
-		database.PrepareDB(db.GetDB(), ctx)
+		database.PrepareDB(pgPool, ctx)
 	}
-
-	storage := server.InitStorage()
-	newServ := server.NewServ(conf, storage, ctx)
+	newServ := server.NewServ(conf, storage, ctx, pgPool)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 
@@ -56,10 +57,10 @@ func main() {
 			r.Post(`/api/shorten/{query}`, newServ.HandleAPI)
 			r.Get(`/ping`, newServ.HandlePing)
 			r.Get(`/{query}`, newServ.HandleGET)
+			r.Get(`/api/user/{query}`, newServ.HandleAPI)
 		})
 		newServ.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)
-			r.Get(`/api/user/{query}`, newServ.HandleAPI)
 			r.Delete(`/api/user/{query}`, newServ.HandleAPI)
 		})
 	})
