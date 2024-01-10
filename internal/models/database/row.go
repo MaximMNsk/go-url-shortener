@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"strconv"
 )
 
 type DBStorage struct {
@@ -286,7 +285,7 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
-	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
+	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, userID.(string))
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
 	}
@@ -331,6 +330,7 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() {
 
 func (jsonData *DBStorage) AsyncSaver() {
 	ToDeleteCh = make(chan DeleteItem)
+	defer close(ToDeleteCh)
 
 	for {
 		//fmt.Println(jsonData.ToDeleteChs)
