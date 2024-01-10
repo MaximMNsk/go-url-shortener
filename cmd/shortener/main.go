@@ -57,11 +57,11 @@ func main() {
 			r.Post(`/api/shorten/{query}`, newServ.HandleAPI)
 			r.Get(`/ping`, newServ.HandlePing)
 			r.Get(`/{query}`, newServ.HandleGET)
-			r.Get(`/api/user/{query}`, newServ.HandleAPI)
 		})
 		newServ.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)
 			r.Delete(`/api/user/{query}`, newServ.HandleAPI)
+			r.Get(`/api/user/{query}`, newServ.HandleAPI)
 		})
 	})
 
