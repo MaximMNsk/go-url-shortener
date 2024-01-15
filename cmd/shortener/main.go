@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
@@ -11,7 +9,6 @@ import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"net/http"
 )
 
@@ -31,17 +28,9 @@ func main() {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 	}
 
-	var pgPool *pgxpool.Pool
-	storage := server.ChooseStorage()
-	if confModule.Config.Env.DB != `` || confModule.Config.Flag.DB != `` {
-		pgPool, err = db.Connect(ctx)
-		defer db.Close(pgPool)
-		if err != nil {
-			logger.PrintLog(logger.ERROR, "Failed connect to DB")
-		}
-		database.PrepareDB(pgPool, ctx)
-	}
-	newServ := server.NewServ(conf, storage, ctx, pgPool)
+	storage := server.ChooseStorage(ctx)
+	defer storage.Destroy()
+	newServ := server.NewServ(conf, storage, ctx)
 
 	logger.PrintLog(logger.INFO, "Declaring router")
 

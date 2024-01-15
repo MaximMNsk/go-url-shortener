@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/stretchr/testify/assert"
@@ -60,10 +59,11 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
+	ctx := context.Background()
 	config, _ := confModule.HandleConfig()
-	storage := server.ChooseStorage()
-	pgPool, _ := db.Connect(context.Background())
-	serve := server.NewServ(config, storage, context.Background(), pgPool)
+	storage := server.ChooseStorage(ctx)
+	//pgPool, _ := db.Connect(context.Background())
+	serve := server.NewServ(config, storage, context.Background())
 
 	for _, tt := range tests {
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
@@ -25,13 +26,16 @@ type DBStorage struct {
 	ConnectionPool *pgxpool.Pool
 }
 
-func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, pool *pgxpool.Pool) {
+func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
 	jsonData.Ctx = ctx
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.DeletedFlag = isDeleted
-	jsonData.ConnectionPool = pool
+}
+
+func (jsonData *DBStorage) Destroy() {
+	db.Close(jsonData.ConnectionPool)
 }
 
 const createSchemaQuery = `

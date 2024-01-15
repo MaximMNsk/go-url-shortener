@@ -2,11 +2,10 @@ package model
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Storable interface {
-	Init(link, shortLink, id string, isDeleted bool, ctx context.Context, pool *pgxpool.Pool)
+	Init(link, shortLink, id string, isDeleted bool, ctx context.Context)
 	Get() (string, bool, error)
 	Set() error
 	Ping() bool
@@ -14,4 +13,5 @@ type Storable interface {
 	HandleUserUrls() ([]byte, error)
 	HandleUserUrlsDelete()
 	AsyncSaver()
+	Destroy()
 }
