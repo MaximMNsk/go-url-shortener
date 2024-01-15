@@ -172,6 +172,7 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 	if byteRes == nil {
 		fmt.Println(byteRes)
 		httpResp.NoContent(res, httpResp.Additional{})
+		//httpResp.Unauthorized(res, httpResp.Additional{})
 		return
 	}
 

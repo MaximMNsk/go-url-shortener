@@ -54,7 +54,8 @@ func AuthChecker(next http.Handler) http.Handler {
 		token, err := r.Cookie("token")
 		if err != nil {
 			additional := httpResp.Additional{}
-			httpResp.NoContent(w, additional)
+			//httpResp.NoContent(w, additional)
+			httpResp.Unauthorized(w, additional)
 			return
 		}
 		logger.PrintLog(logger.DEBUG, `Present token: `+token.Value)
