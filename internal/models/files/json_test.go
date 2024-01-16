@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"fmt"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
@@ -125,10 +126,11 @@ func TestJSONDataGet_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
 			jsonData := FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
+				//Link:      tt.fields.Link,
+				//ShortLink: tt.fields.ShortLink,
+				//ID:        tt.fields.ID,
 			}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
 			link, _, _ := jsonData.Get()
 			assert.EqualValues(t, tt.want.Link, link)
 		})
