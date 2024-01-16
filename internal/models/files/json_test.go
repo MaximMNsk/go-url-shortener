@@ -78,11 +78,8 @@ func TestJSONDataSet_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData := &FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
-			}
+			jsonData := &FileStorage{}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
 			_ = jsonData.Set()
 			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
@@ -125,11 +122,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			jsonData := FileStorage{
-				//Link:      tt.fields.Link,
-				//ShortLink: tt.fields.ShortLink,
-				//ID:        tt.fields.ID,
-			}
+			jsonData := FileStorage{}
 			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
 			link, _, _ := jsonData.Get()
 			assert.EqualValues(t, tt.want.Link, link)
