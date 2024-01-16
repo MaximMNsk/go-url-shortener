@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
@@ -26,9 +27,22 @@ func main() {
 	conf, err := confModule.HandleConfig()
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
+		return
 	}
 
-	storage := server.ChooseStorage(ctx)
+	storage, err := server.ChooseStorage(ctx)
+	if err != nil {
+		var serverHandlersErr *server.ErrorHandlers
+		if errors.As(err, &serverHandlersErr) {
+			logger.PrintLog(logger.FATAL, "Can't handle storage.")
+			logger.PrintLog(logger.FATAL, err.Error())
+			return
+		}
+		logger.PrintLog(logger.FATAL, "Can't create storage environment.")
+		logger.PrintLog(logger.FATAL, errors.Unwrap(err).Error())
+		return
+	}
+
 	defer storage.Destroy()
 	newServ := server.NewServ(conf, storage, ctx)
 

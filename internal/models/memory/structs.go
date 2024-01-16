@@ -3,13 +3,25 @@ package memory
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"fmt"
 	memoryStorage "github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"sync"
 )
+
+type ErrorMemory struct {
+	layer          string
+	parentFuncName string
+	funcName       string
+	message        string
+}
+
+func (e *ErrorMemory) Error() string {
+	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
+}
+
+const layer = `Memory`
 
 type MemStorage struct {
 	Link        string `json:"original_url"`
@@ -31,13 +43,11 @@ func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx
 func (jsonData *MemStorage) Destroy() {
 }
 
-func (jsonData *MemStorage) Ping() bool {
-	return true
+func (jsonData *MemStorage) Ping() (bool, error) {
+	return true, nil
 }
 
 func (jsonData *MemStorage) Get() (string, bool, error) {
-
-	logger.PrintLog(logger.INFO, "Get from memory")
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -45,8 +55,15 @@ func (jsonData *MemStorage) Get() (string, bool, error) {
 
 	storageData := jsonData.Storage.Get()
 
+	errGet := ErrorMemory{
+		layer:          layer,
+		funcName:       `Get`,
+		parentFuncName: `-`,
+	}
+
 	if len(storageData) == 0 {
-		return "", false, errors.New("data not found")
+		errGet.message = "data not found"
+		return "", false, &errGet
 	}
 
 	for _, v := range storageData {
@@ -54,12 +71,11 @@ func (jsonData *MemStorage) Get() (string, bool, error) {
 			return v.Link, v.DeletedFlag, nil
 		}
 	}
-	return "", false, errors.New("data not found")
+	errGet.message = "data not found"
+	return "", false, &errGet
 }
 
 func (jsonData *MemStorage) Set() error {
-
-	logger.PrintLog(logger.INFO, "Set to memory")
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -97,18 +113,24 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 	mx.Lock()
 	defer mx.Unlock()
 
+	errBatchSet := ErrorMemory{
+		layer:          layer,
+		funcName:       `BatchSet`,
+		parentFuncName: `-`,
+	}
+
 	var savingData []MemStorage
 	var outputData []outputBatch
 
 	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
-		return nil, err
+		errBatchSet.message = `unmarshal error`
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	for i, v := range savingData {
 		shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
 		savingData[i].ShortLink = shortLink
-		//storage[savingData[i].ID] = savingData[i]
 		var toStore = memoryStorage.StorageItem{
 			Link:        savingData[i].Link,
 			ShortLink:   shortLink,
@@ -121,7 +143,8 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
-		logger.PrintLog(logger.WARN, err.Error())
+		errBatchSet.message = `marshal error`
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	return JSONResp, nil
@@ -133,6 +156,13 @@ type JSONCutted struct {
 }
 
 func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
+
+	errHandleUserUrls := ErrorMemory{
+		layer:          layer,
+		funcName:       `HandleUserUrls`,
+		parentFuncName: `-`,
+	}
+
 	storage := jsonData.Storage.Get()
 	if len(storage) > 0 {
 		var resp JSONCutted
@@ -143,7 +173,11 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 			batchResp = append(batchResp, resp)
 		}
 		JSONResp, err := json.Marshal(batchResp)
-		return JSONResp, err
+		if err != nil {
+			errHandleUserUrls.message = `marshal error`
+			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
+		}
+		return JSONResp, nil
 	}
 	return nil, nil
 }

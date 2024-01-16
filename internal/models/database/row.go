@@ -11,10 +11,22 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
 )
+
+type ErrorDB struct {
+	layer          string
+	parentFuncName string
+	funcName       string
+	message        string
+}
+
+func (e *ErrorDB) Error() string {
+	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
+}
+
+const layer = `DB`
 
 type DBStorage struct {
 	Ctx            context.Context
@@ -79,78 +91,108 @@ update shortener.short_links set is_deleted = true where uid = $1 and user_id = 
 const updateRowNoUser = `
 update shortener.short_links set is_deleted = true where uid = $1`
 
-func PrepareDB(connect *pgxpool.Pool, ctx context.Context) {
+func PrepareDB(connect *pgxpool.Pool, ctx context.Context) error {
 	_, err := connect.Exec(ctx, createSchemaQuery)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can't create schema: "+err.Error())
-		return
+		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `PrepareDB`,
+			message:        err.Error(),
+		})
+		return prepareErr
 	}
 
 	_, err = connect.Exec(ctx, createTableQuery)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can't create table: "+err.Error())
-		return
+		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `PrepareDB`,
+			message:        err.Error(),
+		})
+		return prepareErr
 	}
 
 	_, err = connect.Exec(ctx, createIndexQuery)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can't create index: "+err.Error())
-		return
+		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `PrepareDB`,
+			message:        err.Error(),
+		})
+		return prepareErr
 	}
+	return nil
 }
 
-func (jsonData *DBStorage) Ping() bool {
+func (jsonData *DBStorage) Ping() (bool, error) {
 	ctx := jsonData.Ctx
 	connection := jsonData.ConnectionPool
 
 	err := connection.Ping(ctx)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, err.Error())
-		return false
+		pingErr := fmt.Errorf(`%w`, &ErrorDB{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `Ping`,
+			message:        err.Error(),
+		})
+		return false, pingErr
 	}
-	return true
+	return true, nil
 }
 
 func (jsonData *DBStorage) Get() (string, bool, error) {
+	getErr := ErrorDB{
+		layer:          layer,
+		parentFuncName: `-`,
+		funcName:       `Get`,
+		message:        `Error occurred`,
+	}
 
-	logger.PrintLog(logger.INFO, "Get from database")
 	row, err := getData(*jsonData)
-	return row.Link, row.DeletedFlag, err
-
+	if err != nil {
+		return row.Link, row.DeletedFlag, fmt.Errorf(getErr.Error()+`%w`, err)
+	}
+	return row.Link, row.DeletedFlag, nil
 }
 
 func getData(data DBStorage) (DBStorage, error) {
 
-	//var mx sync.Mutex
-	//mx.Lock()
-	//defer mx.Unlock()
-
 	ctx := data.Ctx
-	//ctx := context.Background()
 	var selected DBStorage
 	connection := data.ConnectionPool
+
+	getDataErr := ErrorDB{
+		layer:          layer,
+		parentFuncName: `Get`,
+		funcName:       `getData`,
+	}
 
 	userID := ctx.Value(cookie.UserNum(`UserID`))
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
-		return selected, err
+		getDataErr.message = err.Error()
+		return selected, &getDataErr
 	}
 	defer acquire.Release()
 
 	if connection == nil {
-		return selected, errors.New("connection to DB not found")
+		connErr := errors.New("connection to DB not found")
+		getDataErr.message = connErr.Error()
+		return selected, &getDataErr
 	}
 	query := selectRow
 	row := acquire.QueryRow(ctx, query, data.ID, data.Link)
 
 	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
-		fmt.Println(`userID`, userID)
-		fmt.Println(`short`, data.ID)
-		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
-		errData := fmt.Sprintf("ID: %s, Link: %s, ShortLink: %s, DeletedFlag: %v", selected.ID, selected.Link, selected.ShortLink, selected.DeletedFlag)
-		logger.PrintLog(logger.WARN, "Select content: "+errData)
+		getDataErr.message = fmt.Sprintf(`Error: %v, ID: %s, Link: %s, UserID: %s`,
+			err.Error(), data.ID, data.Link, userID)
+		return selected, &getDataErr
 	}
 
 	return selected, nil
@@ -158,43 +200,51 @@ func getData(data DBStorage) (DBStorage, error) {
 
 func (jsonData *DBStorage) Set() error {
 
-	logger.PrintLog(logger.INFO, "Set to database")
+	errSet := ErrorDB{
+		layer:          layer,
+		funcName:       `Set`,
+		parentFuncName: `-`,
+	}
 
 	var err error
 	*jsonData, err = saveData(*jsonData)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Setter. Can't save. Error: "+err.Error())
+		errSet.message = `cannot set data to database`
+		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
-	return err
+	return nil
 }
 
 func saveData(data DBStorage) (DBStorage, error) {
 
-	//var mx sync.Mutex
-	//mx.Lock()
-	//defer mx.Unlock()
+	errSave := ErrorDB{
+		layer:          layer,
+		funcName:       `saveData`,
+		parentFuncName: `Set`,
+	}
 
 	ctx := data.Ctx
 	connection := data.ConnectionPool
 	if connection == nil {
-		return DBStorage{}, errors.New("connection to DB not found")
+		errSave.message = `connection to DB not found`
+		return DBStorage{}, &errSave
 	}
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
-		return DBStorage{}, err
+		errSave.message = `cant acquire connection`
+		return DBStorage{}, fmt.Errorf(errSave.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
 	userID := ctx.Value(cookie.UserNum(`UserID`))
 
 	_, err = acquire.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
-	var pgErr *pgconn.PgError
-	errors.As(err, &pgErr)
 
-	if pgErr != nil {
-		logger.PrintLog(logger.WARN, "Insert attention: "+err.Error())
-		return data, pgErr
+	if err != nil {
+		errSave.message = `cannot insert row`
+		dbErr := fmt.Errorf(errSave.Error()+`: %w`, err)
+		return DBStorage{}, fmt.Errorf(dbErr.Error()+`: %w`, err)
 	}
 
 	return data, nil
@@ -207,16 +257,19 @@ type outputBatch struct {
 
 func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
-	//var mx sync.Mutex
-	//mx.Lock()
-	//defer mx.Unlock()
-
 	var savingData []DBStorage
 	var outputData []outputBatch
 
+	errBatchSet := ErrorDB{
+		layer:          layer,
+		funcName:       `BatchSet`,
+		parentFuncName: `-`,
+	}
+
 	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
 	if err != nil {
-		return nil, err
+		errBatchSet.message = `unmarshal error`
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	for i, v := range savingData {
@@ -234,12 +287,14 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	///////// Current logic
 	connection := jsonData.ConnectionPool
 	if connection == nil {
-		return nil, errors.New("connection to DB not found")
+		errBatchSet.message = "connection to DB not found"
+		return nil, &errBatchSet
 	}
 
 	acquire, err := connection.Acquire(jsonData.Ctx)
 	if err != nil {
-		return nil, err
+		errBatchSet.message = "cannot acquire connection"
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
@@ -249,19 +304,19 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	}
 	br := acquire.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
-	_, err = br.Exec()
-
-	var pgErr *pgconn.PgError
-	errors.As(err, &pgErr)
+	_, errPg := br.Exec()
 	//////// End logic
 
 	JSONResp, err := json.Marshal(outputData)
-	if err != nil {
-		logger.PrintLog(logger.WARN, err.Error())
-		return nil, err
+
+	if errPg != nil {
+		errBatchSet.message = "batch insert error"
+		return JSONResp, fmt.Errorf(errBatchSet.Error()+`: %w`, errPg)
 	}
-	if pgErr != nil {
-		return JSONResp, pgErr
+
+	if err != nil {
+		errBatchSet.message = "unmarshal error"
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	return JSONResp, nil
@@ -274,17 +329,25 @@ type JSONCutted struct {
 
 func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	var batchResp []JSONCutted
+
+	errHandleUserUrls := ErrorDB{
+		layer:          layer,
+		funcName:       `HandleUserUrls`,
+		parentFuncName: `-`,
+	}
+
 	connection := jsonData.ConnectionPool
 	if connection == nil {
-		return nil, errors.New("connection to DB not found")
+		errHandleUserUrls.message = "connection to DB not found"
+		return nil, &errHandleUserUrls
 	}
 
 	ctx := jsonData.Ctx
-	//ctx := context.Background()
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
-		return nil, err
+		errHandleUserUrls.message = "cannot acquire connection"
+		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
@@ -292,19 +355,25 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 
 	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
 	if err != nil {
-		logger.PrintLog(logger.WARN, "Select attention: "+err.Error())
+		errHandleUserUrls.message = "select error"
+		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 	}
 	for rows.Next() {
 		var selected JSONCutted
 		err = rows.Scan(&selected.Link, &selected.ShortLink)
 		if err != nil {
-			logger.PrintLog(logger.ERROR, "Sort select result error: "+err.Error())
+			errHandleUserUrls.message = "fetch error"
+			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 		}
 		batchResp = append(batchResp, selected)
 	}
 	if len(batchResp) > 0 {
 		JSONResp, err := json.Marshal(batchResp)
-		return JSONResp, err
+		if err != nil {
+			errHandleUserUrls.message = "marshal error"
+			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
+		}
+		return JSONResp, nil
 	}
 
 	return nil, nil
@@ -319,8 +388,6 @@ var ToDeleteCh chan DeleteItem
 
 func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
-	//doneCh := make(chan struct{})
-	//defer close(doneCh)
 
 	inputData := DeleteItem{
 		URLs:   jsonData.Link,
@@ -329,7 +396,6 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() {
 
 	go func() {
 		ToDeleteCh <- inputData
-		//fmt.Println(`Data sent`)
 	}()
 }
 
@@ -337,38 +403,47 @@ func (jsonData *DBStorage) AsyncSaver() {
 	ToDeleteCh = make(chan DeleteItem)
 	defer close(ToDeleteCh)
 
+	errHandleUserUrlsDelete := ErrorDB{
+		layer:          layer,
+		funcName:       `AsyncSaver`,
+		parentFuncName: `-`,
+	}
+
 	for {
-		//fmt.Println(jsonData.ToDeleteChs)
 		if ToDeleteCh == nil {
-			//fmt.Println(`Nil channel`)
-			//time.Sleep(1 * time.Second)
 			continue
 		}
 		select {
 		case data, ok := <-ToDeleteCh:
 			if !ok {
-				fmt.Println(`!ok`)
+				errHandleUserUrlsDelete.message = `channel reading error`
+				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error())
 				continue
 			}
-			fmt.Println(`Delete data:`)
-			fmt.Println(data)
 			err := batchUpdate(data.URLs, data.UserID, jsonData.ConnectionPool)
 			if err != nil {
-				fmt.Println(`Delete error:`, err)
+				errHandleUserUrlsDelete.message = `update error`
+				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error())
 				continue
 			}
 		default:
-			//fmt.Println(`Listen channel`)
 		}
-		//time.Sleep(1 * time.Second)
 	}
 }
 
 func explodeURLs(data string) ([]string, error) {
+
+	errExplodeURLs := ErrorDB{
+		layer:          layer,
+		funcName:       `explodeURLs`,
+		parentFuncName: `batchUpdate`,
+	}
+
 	var out []string
 	err := json.Unmarshal([]byte(data), &out)
 	if err != nil {
-		return make([]string, 0), err
+		errExplodeURLs.message = `unmarshal error`
+		return make([]string, 0), fmt.Errorf(errExplodeURLs.Error()+`: %w`, err)
 	}
 	var uniqueResult = make(map[string]bool)
 	for _, v := range out {
@@ -383,31 +458,34 @@ func explodeURLs(data string) ([]string, error) {
 
 func batchUpdate(links string, userID int, pool *pgxpool.Pool) error {
 
-	//var mx sync.Mutex
-	//mx.Lock()
-	//defer mx.Unlock()
+	errBatchUpdate := ErrorDB{
+		layer:          layer,
+		funcName:       `errBatchUpdate`,
+		parentFuncName: `AsyncSaver`,
+	}
 
 	data, err := explodeURLs(links)
 	if err != nil {
-		fmt.Println(err)
+		errBatchUpdate.message = `explode error`
+		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 
 	connection := pool
 	ctx := context.Background()
 	if connection == nil {
-		return errors.New("connection to DB not found")
+		errBatchUpdate.message = `connection to DB not found`
+		return &errBatchUpdate
 	}
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
-		return err
+		errBatchUpdate.message = `acquire error`
+		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
 	var batch pgx.Batch
 	for _, uid := range data {
-		//fmt.Printf(`I: %d, Uid: %s, userID: %d`+"\n", i, uid, userID)
-		//batch.Queue(updateRow, uid, strconv.Itoa(userID))
 		batch.Queue(updateRowNoUser, uid)
 	}
 
@@ -415,8 +493,10 @@ func batchUpdate(links string, userID int, pool *pgxpool.Pool) error {
 	defer br.Close()
 	_, err = br.Exec()
 
-	var pgErr *pgconn.PgError
-	errors.As(err, &pgErr)
+	if err != nil {
+		errBatchUpdate.message = `batch update error`
+		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
+	}
 
 	return err
 }

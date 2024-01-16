@@ -61,7 +61,7 @@ func Test_handleMainPage(t *testing.T) {
 	var shortLink string
 	ctx := context.Background()
 	config, _ := confModule.HandleConfig()
-	storage := server.ChooseStorage(ctx)
+	storage, _ := server.ChooseStorage(ctx)
 	//pgPool, _ := db.Connect(context.Background())
 	serve := server.NewServ(config, storage, context.Background())
 
