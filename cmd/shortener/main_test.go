@@ -83,7 +83,8 @@ func Test_handleMainPage(t *testing.T) {
 				require.NoError(t, err)
 				shortLink = string(linkResult)
 				require.NotEmpty(t, shortLink)
-				_ = result.Body.Close()
+				err = result.Body.Close()
+				require.NoError(t, err)
 			}
 
 			//if tt.name == "Get link" {

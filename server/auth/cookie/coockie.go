@@ -2,6 +2,7 @@ package cookie
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
@@ -26,21 +27,23 @@ func AuthSetter(next http.Handler) http.Handler {
 			logger.PrintLog(logger.WARN, err.Error())
 		}
 
-		if err != nil && strings.Contains(err.Error(), `not present`) {
-			logInfo := fmt.Sprintf("Set userID: %d", UserID)
-			logger.PrintLog(logger.INFO, logInfo)
-			newToken, err := BuildJWTString(UserID)
-			if err != nil {
-				logger.PrintLog(logger.WARN, err.Error())
+		if err != nil {
+			if errors.Is(err, http.ErrNoCookie) {
+				logInfo := fmt.Sprintf("Set userID: %d", UserID)
+				logger.PrintLog(logger.INFO, logInfo)
+				newToken, err := BuildJWTString(UserID)
+				if err != nil {
+					logger.PrintLog(logger.WARN, err.Error())
+				}
+				logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
+				cookie := &http.Cookie{
+					Name:    `token`,
+					Value:   newToken,
+					Expires: time.Now().Add(TokenExp),
+					Path:    `/`,
+				}
+				http.SetCookie(w, cookie)
 			}
-			logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
-			cookie := &http.Cookie{
-				Name:    `token`,
-				Value:   newToken,
-				Expires: time.Now().Add(TokenExp),
-				Path:    `/`,
-			}
-			http.SetCookie(w, cookie)
 		}
 		userNumber := UserNum(`UserID`)
 		ctx := context.WithValue(r.Context(), userNumber, strconv.Itoa(UserID))

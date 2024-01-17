@@ -74,16 +74,14 @@ func TestJSONDataSet_Set(t *testing.T) {
 				ID:        "TestID",
 			},
 			args: args{fileName: filepath.Join(config.Default.LinkFile)},
-			//args: args{fileName: filepath.Join(`C:\tmp\test.json`)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			//config.Default.LinkFile = tt.args.fileName
 			jsonData := &FileStorage{}
 			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
 			err := jsonData.Set()
-			fmt.Println(err)
+			assert.NoError(t, err)
 			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
@@ -113,8 +111,6 @@ func TestJSONDataGet_Get(t *testing.T) {
 			},
 			args: args{
 				fileName: filepath.Join(confModule.Config.Default.LinkFile),
-				//fileName: filepath.Join(`C:\tmp\test.json`),
-				//sourceFileName: "./test_source.json",
 			},
 			want: want(FileStorage{
 				Link:      "TestLink",
@@ -128,7 +124,8 @@ func TestJSONDataGet_Get(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
 			jsonData := FileStorage{}
 			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
-			link, _, _ := jsonData.Get()
+			link, _, err := jsonData.Get()
+			assert.NoError(t, err)
 			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}
