@@ -109,9 +109,10 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 				httpResp.Conflict(res, additional)
 				return
 			}
-			httpResp.BadRequest(res)
-			return
 		}
+		logger.PrintLog(logger.ERROR, "Can not set link data: "+setErr.Error())
+		httpResp.BadRequest(res)
+		return
 	}
 	// Отдаем 201 ответ с шортлинком
 	httpResp.Created(res, additional)

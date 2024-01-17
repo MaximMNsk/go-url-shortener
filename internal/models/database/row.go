@@ -206,8 +206,8 @@ func (jsonData *DBStorage) Set() error {
 		parentFuncName: `-`,
 	}
 
-	var err error
-	*jsonData, err = saveData(*jsonData)
+	_, err := saveData(*jsonData)
+
 	if err != nil {
 		errSet.message = `cannot set data to database`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)

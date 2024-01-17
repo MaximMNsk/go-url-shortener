@@ -44,6 +44,7 @@ func main() {
 	}
 
 	defer storage.Destroy()
+
 	newServ := server.NewServ(conf, storage, ctx)
 
 	logger.PrintLog(logger.INFO, "Declaring router")

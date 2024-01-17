@@ -100,12 +100,12 @@ func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
-	defer f.Close()
 	var osType *os.PathError
 	if errors.As(err, &osType) {
 		getDataErr.message = err.Error()
 		return "[]", nil //&getDataErr
 	}
+	defer f.Close()
 
 	for {
 		n, errRead := f.Read(data)
