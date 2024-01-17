@@ -100,11 +100,12 @@ func getData(fileName string) (string, error) {
 	var result string
 	data := make([]byte, 256)
 	f, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
-	if err != nil {
-		getDataErr.message = err.Error()
-		return "[]", &getDataErr
-	}
 	defer f.Close()
+	var osType *os.PathError
+	if errors.As(err, &osType) {
+		getDataErr.message = err.Error()
+		return "[]", nil //&getDataErr
+	}
 
 	for {
 		n, errRead := f.Read(data)
@@ -119,9 +120,9 @@ func getData(fileName string) (string, error) {
 	}
 
 	if result == "" {
-		err = errors.New(`data absent`)
-		getDataErr.message = err.Error()
-		return "[]", &getDataErr
+		//err = errors.New(`data absent`)
+		//getDataErr.message = err.Error()
+		return "[]", nil //&getDataErr
 	}
 
 	return result, nil
@@ -167,35 +168,42 @@ func (jsonData *FileStorage) Set() error {
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	isOk := saveData(content, fileName)
-	if !isOk {
-		err = errors.New("cannot save")
-		errSet.message = `saving data`
-		return fmt.Errorf(errSet.Error()+`: %w`, err)
+	saveErr := saveData(content, fileName)
+	if saveErr != nil {
+		errSet.message = `saving data in ` + fileName
+		return fmt.Errorf(errSet.Error()+`: %w`, saveErr)
 	}
 	return nil
 }
 
-func saveData(data []byte, fileName string) bool {
+func saveData(data []byte, fileName string) error {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
+
+	errSaveData := ErrorFile{
+		layer:          layer,
+		funcName:       `saveData`,
+		parentFuncName: `Set|BatchSet`,
+	}
 
 	f, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	defer func(f *os.File) {
 		err = f.Close()
 	}(f)
 	if err != nil {
-		return false
+		errSaveData.message = `cannot create or open ` + fileName
+		return fmt.Errorf(errSaveData.Error()+`: %w`, err)
 	}
 
 	_, err = f.Write(data)
 	if err != nil {
-		return false
-	} else {
-		return true
+		errSaveData.message = `cannot write ` + fileName
+		return fmt.Errorf(errSaveData.Error()+`: %w`, err)
 	}
+
+	return nil
 }
 
 func MakeStorageFile(fileName string) error {
@@ -286,10 +294,10 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
-	isOk := saveData(content, fileName)
-	if !isOk {
+	saveErr := saveData(content, fileName)
+	if saveErr != nil {
 		errBatchSet.message = `can't save`
-		return []byte(""), &errBatchSet
+		return []byte(""), fmt.Errorf(errBatchSet.Error()+`: %w`, saveErr)
 	}
 	//////// End logic
 
