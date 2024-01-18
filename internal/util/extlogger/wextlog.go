@@ -2,10 +2,12 @@ package extlogger
 
 import (
 	"fmt"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -69,6 +71,13 @@ func Log(h http.Handler) http.Handler {
 		}
 
 		body, _ := io.ReadAll(r.Body)
+		defer r.Body.Close()
+
+		var UserID cookie.UserNum
+		token, err := r.Cookie("token")
+		if err == nil {
+			UserID = cookie.UserNum(strconv.Itoa(cookie.GetUserID(token.Value)))
+		}
 
 		log.Info().
 			Time("StartTime", start).
@@ -79,6 +88,7 @@ func Log(h http.Handler) http.Handler {
 			Str("Content-Encoding", r.Header.Get("Content-Encoding")).
 			Str("Body", string(body)).
 			Str("URL", fmt.Sprintf("%s%s%s", scheme, r.Host, r.URL.Path)).
+			Str("UserID", string(UserID)).
 			Int("Status", responseData.status).
 			Int("Size", responseData.size).
 			Send()

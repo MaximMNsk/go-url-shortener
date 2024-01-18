@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/stretchr/testify/assert"
@@ -58,9 +59,11 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
+	ctx := context.Background()
 	config, _ := confModule.HandleConfig()
-	storage := server.InitStorage()
-	serve := server.NewServ(config, storage)
+	storage, _ := server.ChooseStorage(ctx)
+	//pgPool, _ := db.Connect(context.Background())
+	serve := server.NewServ(config, storage, context.Background())
 
 	for _, tt := range tests {
 
@@ -80,20 +83,9 @@ func Test_handleMainPage(t *testing.T) {
 				require.NoError(t, err)
 				shortLink = string(linkResult)
 				require.NotEmpty(t, shortLink)
-				_ = result.Body.Close()
+				err = result.Body.Close()
+				require.NoError(t, err)
 			}
-
-			//if tt.name == "Get link" {
-			//	request := httptest.NewRequest(tt.args.method, shortLink, nil)
-			//	w := httptest.NewRecorder()
-			//	handleGET(w, request)
-			//
-			//	result := w.Result()
-			//	assert.Equal(t, tt.want.statusCode, result.StatusCode)
-			//	assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-			//	assert.Equal(t, tt.want.response, result.Header.Get("Location"))
-			//	_ = result.Body.Close()
-			//}
 
 		})
 	}

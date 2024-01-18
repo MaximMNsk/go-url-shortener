@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"fmt"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
@@ -77,12 +78,10 @@ func TestJSONDataSet_Set(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData := &FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
-			}
-			_ = jsonData.Set()
+			jsonData := &FileStorage{}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
+			err := jsonData.Set()
+			assert.NoError(t, err)
 			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
@@ -112,7 +111,6 @@ func TestJSONDataGet_Get(t *testing.T) {
 			},
 			args: args{
 				fileName: filepath.Join(confModule.Config.Default.LinkFile),
-				//sourceFileName: "./test_source.json",
 			},
 			want: want(FileStorage{
 				Link:      "TestLink",
@@ -124,12 +122,10 @@ func TestJSONDataGet_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			jsonData := FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
-			}
-			link, _ := jsonData.Get()
+			jsonData := FileStorage{}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background())
+			link, _, err := jsonData.Get()
+			assert.NoError(t, err)
 			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}
