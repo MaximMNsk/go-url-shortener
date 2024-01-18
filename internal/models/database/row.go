@@ -103,10 +103,8 @@ func PrepareDB() error {
 }
 
 func (jsonData *DBStorage) Ping() (bool, error) {
-	ctx := jsonData.Ctx
-	connection := jsonData.ConnectionPool
 
-	err := connection.Ping(ctx)
+	err := jsonData.ConnectionPool.Ping(jsonData.Ctx)
 	if err != nil {
 		pingErr := fmt.Errorf(`%w`, &ErrorDB{
 			layer:          layer,
@@ -136,7 +134,6 @@ func (jsonData *DBStorage) Get() (string, bool, error) {
 
 func getData(data DBStorage) (DBStorage, error) {
 
-	ctx := data.Ctx
 	var selected DBStorage
 	connection := data.ConnectionPool
 
@@ -146,9 +143,9 @@ func getData(data DBStorage) (DBStorage, error) {
 		funcName:       `getData`,
 	}
 
-	userID := ctx.Value(cookie.UserNum(`UserID`))
+	userID := data.Ctx.Value(cookie.UserNum(`UserID`))
 
-	acquire, err := connection.Acquire(ctx)
+	acquire, err := connection.Acquire(data.Ctx)
 	if err != nil {
 		getDataErr.message = err.Error()
 		return selected, &getDataErr
@@ -161,7 +158,7 @@ func getData(data DBStorage) (DBStorage, error) {
 		return selected, &getDataErr
 	}
 	query := selectRow
-	row := acquire.QueryRow(ctx, query, data.ID, data.Link)
+	row := acquire.QueryRow(data.Ctx, query, data.ID, data.Link)
 
 	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
@@ -181,7 +178,7 @@ func (jsonData *DBStorage) Set() error {
 		parentFuncName: `-`,
 	}
 
-	_, err := saveData(*jsonData)
+	err := saveData(*jsonData)
 
 	if err != nil {
 		errSet.message = `cannot set data to database`
@@ -190,7 +187,7 @@ func (jsonData *DBStorage) Set() error {
 	return nil
 }
 
-func saveData(data DBStorage) (DBStorage, error) {
+func saveData(data DBStorage) error {
 
 	errSave := ErrorDB{
 		layer:          layer,
@@ -202,13 +199,13 @@ func saveData(data DBStorage) (DBStorage, error) {
 	connection := data.ConnectionPool
 	if connection == nil {
 		errSave.message = `connection to DB not found`
-		return DBStorage{}, &errSave
+		return &errSave
 	}
 
 	acquire, err := connection.Acquire(ctx)
 	if err != nil {
 		errSave.message = `cant acquire connection`
-		return DBStorage{}, fmt.Errorf(errSave.Error()+`: %w`, err)
+		return fmt.Errorf(errSave.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
@@ -219,10 +216,10 @@ func saveData(data DBStorage) (DBStorage, error) {
 	if err != nil {
 		errSave.message = `cannot insert row`
 		dbErr := fmt.Errorf(errSave.Error()+`: %w`, err)
-		return DBStorage{}, fmt.Errorf(dbErr.Error()+`: %w`, err)
+		return fmt.Errorf(dbErr.Error()+`: %w`, err)
 	}
 
-	return data, nil
+	return nil
 }
 
 type outputBatch struct {
@@ -259,14 +256,12 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
 
-	///////// Current logic
-	connection := jsonData.ConnectionPool
-	if connection == nil {
+	if jsonData.ConnectionPool == nil {
 		errBatchSet.message = "connection to DB not found"
 		return nil, &errBatchSet
 	}
 
-	acquire, err := connection.Acquire(jsonData.Ctx)
+	acquire, err := jsonData.ConnectionPool.Acquire(jsonData.Ctx)
 	if err != nil {
 		errBatchSet.message = "cannot acquire connection"
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
@@ -280,7 +275,6 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	br := acquire.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
 	_, errPg := br.Exec()
-	//////// End logic
 
 	JSONResp, err := json.Marshal(outputData)
 
@@ -311,15 +305,12 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	connection := jsonData.ConnectionPool
-	if connection == nil {
+	if jsonData.ConnectionPool == nil {
 		errHandleUserUrls.message = "connection to DB not found"
 		return nil, &errHandleUserUrls
 	}
 
-	ctx := jsonData.Ctx
-
-	acquire, err := connection.Acquire(ctx)
+	acquire, err := jsonData.ConnectionPool.Acquire(jsonData.Ctx)
 	if err != nil {
 		errHandleUserUrls.message = "cannot acquire connection"
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
@@ -359,7 +350,7 @@ type DeleteItem struct {
 	UserID int
 }
 
-var ToDeleteCh chan DeleteItem
+var toDeleteCh chan DeleteItem
 
 func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
@@ -370,13 +361,13 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	}
 
 	go func() {
-		ToDeleteCh <- inputData
+		toDeleteCh <- inputData
 	}()
 }
 
 func (jsonData *DBStorage) AsyncSaver() {
-	ToDeleteCh = make(chan DeleteItem)
-	defer close(ToDeleteCh)
+	toDeleteCh = make(chan DeleteItem)
+	defer close(toDeleteCh)
 
 	errHandleUserUrlsDelete := ErrorDB{
 		layer:          layer,
@@ -385,17 +376,17 @@ func (jsonData *DBStorage) AsyncSaver() {
 	}
 
 	for {
-		if ToDeleteCh == nil {
+		if toDeleteCh == nil {
 			continue
 		}
 		select {
-		case data, ok := <-ToDeleteCh:
+		case data, ok := <-toDeleteCh:
 			if !ok {
 				errHandleUserUrlsDelete.message = `channel reading error`
 				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error())
 				continue
 			}
-			err := batchUpdate(data.URLs, data.UserID, jsonData.ConnectionPool)
+			err := batchUpdate(data.URLs, jsonData.ConnectionPool)
 			if err != nil {
 				errHandleUserUrlsDelete.message = `update error`
 				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error())
@@ -431,7 +422,7 @@ func explodeURLs(data string) ([]string, error) {
 	return result, nil
 }
 
-func batchUpdate(links string, userID int, pool *pgxpool.Pool) error {
+func batchUpdate(links string, pool *pgxpool.Pool) error {
 
 	errBatchUpdate := ErrorDB{
 		layer:          layer,
@@ -445,14 +436,13 @@ func batchUpdate(links string, userID int, pool *pgxpool.Pool) error {
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 
-	connection := pool
 	ctx := context.Background()
-	if connection == nil {
+	if pool == nil {
 		errBatchUpdate.message = `connection to DB not found`
 		return &errBatchUpdate
 	}
 
-	acquire, err := connection.Acquire(ctx)
+	acquire, err := pool.Acquire(ctx)
 	if err != nil {
 		errBatchUpdate.message = `acquire error`
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)

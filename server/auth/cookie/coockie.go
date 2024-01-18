@@ -169,12 +169,10 @@ func GetUserID(tokenString string) int {
 	}
 
 	if !token.Valid {
-		//fmt.Println("Token is not valid")
 		logger.PrintLog(logger.WARN, `Invalid token`)
 		return -1
 	}
 
-	//fmt.Println("Token is valid")
 	logger.PrintLog(logger.INFO, `Token is valid!`)
 
 	// возвращаем ID пользователя в читаемом виде
