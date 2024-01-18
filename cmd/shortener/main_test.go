@@ -87,18 +87,6 @@ func Test_handleMainPage(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			//if tt.name == "Get link" {
-			//	request := httptest.NewRequest(tt.args.method, shortLink, nil)
-			//	w := httptest.NewRecorder()
-			//	handleGET(w, request)
-			//
-			//	result := w.Result()
-			//	assert.Equal(t, tt.want.statusCode, result.StatusCode)
-			//	assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-			//	assert.Equal(t, tt.want.response, result.Header.Get("Location"))
-			//	_ = result.Body.Close()
-			//}
-
 		})
 	}
 }

@@ -92,7 +92,7 @@ func PrepareDB() error {
 	}
 	err = m.Up()
 	if err != nil {
-		if errors.As(err, &migrate.ErrNoChange) {
+		if errors.Is(err, migrate.ErrNoChange) {
 			return nil
 		}
 		prepareErr.message = `migrate error`
