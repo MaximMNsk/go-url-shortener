@@ -330,7 +330,7 @@ func ChooseStorage(ctx context.Context) (model.Storable, error) {
 		storage = &database.DBStorage{
 			ConnectionPool: pgPool,
 		}
-		err = database.PrepareDB(pgPool, ctx)
+		err = database.PrepareDB()
 		if err != nil {
 			return storage, fmt.Errorf(pgPoolErr.Error()+`%w`, err)
 		}

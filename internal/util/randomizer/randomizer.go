@@ -6,12 +6,12 @@ import (
 )
 
 func RandDigitalBytes(count int) (int, error) {
-	min := 1
+	minimum := 1
 	maxVal := ``
 	for i := 1; i <= count; i++ {
 		maxVal += `9`
 	}
-	max, err := strconv.Atoi(maxVal)
-	randInt := rand.Intn(max-min+1) + min
+	maximum, err := strconv.Atoi(maxVal)
+	randInt := rand.Intn(maximum-minimum+1) + minimum
 	return randInt, err
 }

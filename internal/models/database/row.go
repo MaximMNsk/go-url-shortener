@@ -10,6 +10,9 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
@@ -50,80 +53,52 @@ func (jsonData *DBStorage) Destroy() {
 	db.Close(jsonData.ConnectionPool)
 }
 
-const createSchemaQuery = `
-CREATE SCHEMA IF NOT EXISTS shortener 
-AUTHORIZATION postgres`
-
-const createTableQuery = `
-CREATE TABLE IF NOT EXISTS shortener.short_links 
-	(
-	    id serial PRIMARY KEY,
-	    original_url TEXT,
-	    short_url TEXT,
-	    uid TEXT,
-		user_id TEXT,
-		is_deleted BOOLEAN DEFAULT FALSE
-	)`
-
-const createIndexQuery = `
-CREATE UNIQUE INDEX IF NOT EXISTS unique_original_url
-ON shortener.short_links(original_url)`
-
 const insertLinkRow = `
-insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
+insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const insertLinkRowBatch = `
 
-insert into shortener.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
+insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url, is_deleted from shortener.short_links where (uid = $1 or original_url = $2)`
+select uid, original_url, short_url, is_deleted from public.short_links where (uid = $1 or original_url = $2)`
 
 const selectRowByUser = `
-select uid, original_url, short_url from shortener.short_links where (uid = $1 or original_url = $2) and user_id = $3`
+select uid, original_url, short_url from public.short_links where (uid = $1 or original_url = $2) and user_id = $3`
 
 const selectAllRows = `
-select original_url, short_url from shortener.short_links where user_id = $1`
+select original_url, short_url from public.short_links where user_id = $1`
 
 const updateRow = `
-update shortener.short_links set is_deleted = true where uid = $1 and user_id = $2`
+update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
 const updateRowNoUser = `
-update shortener.short_links set is_deleted = true where uid = $1`
+update public.short_links set is_deleted = true where uid = $1`
 
-func PrepareDB(connect *pgxpool.Pool, ctx context.Context) error {
-	_, err := connect.Exec(ctx, createSchemaQuery)
-	if err != nil {
-		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
-			layer:          layer,
-			parentFuncName: `-`,
-			funcName:       `PrepareDB`,
-			message:        err.Error(),
-		})
-		return prepareErr
+func PrepareDB() error {
+
+	prepareErr := ErrorDB{
+		layer:          layer,
+		parentFuncName: `-`,
+		funcName:       `PrepareDB`,
 	}
 
-	_, err = connect.Exec(ctx, createTableQuery)
+	m, err := migrate.New(
+		`file://internal/storage/db/migrations`,
+		confModule.Config.Final.DB)
 	if err != nil {
-		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
-			layer:          layer,
-			parentFuncName: `-`,
-			funcName:       `PrepareDB`,
-			message:        err.Error(),
-		})
-		return prepareErr
+		prepareErr.message = `initialization error`
+		return fmt.Errorf(prepareErr.Error()+`: %w`, err)
+	}
+	err = m.Up()
+	if err != nil {
+		if errors.As(err, &migrate.ErrNoChange) {
+			return nil
+		}
+		prepareErr.message = `migrate error`
+		return fmt.Errorf(prepareErr.Error()+`: %w`, err)
 	}
 
-	_, err = connect.Exec(ctx, createIndexQuery)
-	if err != nil {
-		prepareErr := fmt.Errorf(`%w`, &ErrorDB{
-			layer:          layer,
-			parentFuncName: `-`,
-			funcName:       `PrepareDB`,
-			message:        err.Error(),
-		})
-		return prepareErr
-	}
 	return nil
 }
 
