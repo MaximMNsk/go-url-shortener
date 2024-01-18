@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-//var UserID int
-
 type UserNum string
 
 func AuthSetter(next http.Handler) http.Handler {
@@ -57,7 +55,6 @@ func AuthChecker(next http.Handler) http.Handler {
 		token, err := r.Cookie("token")
 		if err != nil {
 			additional := httpResp.Additional{}
-			//httpResp.NoContent(w, additional)
 			httpResp.Unauthorized(w, additional)
 			return
 		}
@@ -103,7 +100,6 @@ func AuthHandler(next http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), userNumber, UserID)
 			newReqCtx := r.WithContext(ctx)
 			next.ServeHTTP(w, newReqCtx)
-			//next.ServeHTTP(w, r)
 			return
 		}
 

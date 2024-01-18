@@ -103,7 +103,7 @@ func getData(fileName string) (string, error) {
 	var osType *os.PathError
 	if errors.As(err, &osType) {
 		getDataErr.message = err.Error()
-		return "[]", nil //&getDataErr
+		return "[]", nil
 	}
 	defer f.Close()
 
@@ -120,9 +120,7 @@ func getData(fileName string) (string, error) {
 	}
 
 	if result == "" {
-		//err = errors.New(`data absent`)
-		//getDataErr.message = err.Error()
-		return "[]", nil //&getDataErr
+		return "[]", nil
 	}
 
 	return result, nil
@@ -270,7 +268,6 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
-	///////// Current logic
 	var savedData []FileStorage
 
 	fileName := confModule.Config.Final.LinkFile
@@ -299,7 +296,6 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		errBatchSet.message = `can't save`
 		return []byte(""), fmt.Errorf(errBatchSet.Error()+`: %w`, saveErr)
 	}
-	//////// End logic
 
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {

@@ -241,7 +241,6 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	var apiData input
 	err := json.Unmarshal(contentBody, &apiData)
 	if err != nil {
-		//httpResp.InternalError(res)
 		httpResp.BadRequest(res)
 		return
 	}
@@ -253,7 +252,6 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	var JSONResp []byte
 	JSONResp, err = json.Marshal(resp)
 	if err != nil {
-		//httpResp.InternalError(res)
 		httpResp.BadRequest(res)
 		return
 	}
