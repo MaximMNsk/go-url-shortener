@@ -39,14 +39,16 @@ type DBStorage struct {
 	DeletedFlag    bool   `json:"is_deleted"`
 	ToDeleteCh     chan DeleteItem
 	ConnectionPool *pgxpool.Pool
+	Cfg            confModule.OuterConfig
 }
 
-func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
+func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.Ctx = ctx
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.DeletedFlag = isDeleted
+	jsonData.Cfg = cfg
 }
 
 func (jsonData *DBStorage) Destroy() {
@@ -75,7 +77,7 @@ update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 const updateRowNoUser = `
 update public.short_links set is_deleted = true where uid = $1`
 
-func PrepareDB() error {
+func PrepareDB(dsn string) error {
 
 	prepareErr := ErrorDB{
 		layer:          layer,
@@ -85,7 +87,7 @@ func PrepareDB() error {
 
 	m, err := migrate.New(
 		`file://internal/storage/db/migrations`,
-		confModule.Config.Final.DB)
+		dsn)
 	if err != nil {
 		prepareErr.message = `initialization error`
 		return fmt.Errorf(prepareErr.Error()+`: %w`, err)
@@ -209,9 +211,13 @@ func saveData(data DBStorage) error {
 	}
 	defer acquire.Release()
 
-	userID := ctx.Value(cookie.UserNum(`UserID`))
+	userID := `0`
+	reqUserID := ctx.Value(cookie.UserNum(`UserID`))
+	if reqUserID != nil {
+		userID = reqUserID.(string)
+	}
 
-	_, err = acquire.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID.(string))
+	_, err = acquire.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
 
 	if err != nil {
 		errSave.message = `cannot insert row`
@@ -245,7 +251,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
+		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
 
 		savingData[i].ID = v.ID
 		savingData[i].ShortLink = shortLink
@@ -397,7 +403,7 @@ func (jsonData *DBStorage) AsyncSaver() {
 	}
 }
 
-func explodeURLs(data string) ([]string, error) {
+func ExplodeURLs(data string) ([]string, error) {
 
 	errExplodeURLs := ErrorDB{
 		layer:          layer,
@@ -430,7 +436,7 @@ func batchUpdate(links string, pool *pgxpool.Pool) error {
 		parentFuncName: `AsyncSaver`,
 	}
 
-	data, err := explodeURLs(links)
+	data, err := ExplodeURLs(links)
 	if err != nil {
 		errBatchUpdate.message = `explode error`
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)

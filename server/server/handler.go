@@ -38,7 +38,7 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	// Пришел ид
 	requestID := req.URL.Path[1:]
 
-	s.Storage.Init(``, ``, requestID, false, req.Context())
+	s.Storage.Init(``, ``, requestID, false, req.Context(), s.Config)
 	saved, deleted, err := s.Storage.Get()
 	// 400
 	if err != nil {
@@ -91,14 +91,14 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 
 	// Пришел урл
 	linkID := sha1hash.Create(string(contentBody), 8)
-	shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID)
 
 	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: shortLink,
 	}
 
-	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context())
+	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context(), s.Config)
 	setErr := s.Storage.Set()
 
 	if setErr != nil {
@@ -163,13 +163,13 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	}
 	httpResp.Accepted(res, httpResp.Additional{})
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
 	s.Storage.HandleUserUrlsDelete()
 }
 
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
-	s.Storage.Init(``, ``, ``, false, req.Context())
+	s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
 	byteRes, err := s.Storage.HandleUserUrls()
 
 	if err != nil {
@@ -198,7 +198,7 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context())
+	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
 	resData, err := s.Storage.BatchSet()
 	additional := httpResp.Additional{
 		Place:     "body",
@@ -245,7 +245,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 	linkID := sha1hash.Create(apiData.URL, 8)
-	shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID)
+	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID)
 
 	var resp output
 	resp.Result = shortLink
@@ -260,7 +260,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	s.Storage.Init(apiData.URL, shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context())
+	s.Storage.Init(apiData.URL, shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context(), s.Config)
 	err = s.Storage.Set()
 
 	if err != nil {
@@ -287,7 +287,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		parentFuncName: `-`,
 	}
 
-	s.Storage.Init(``, ``, ``, false, req.Context())
+	s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
 	ok, err := s.Storage.Ping()
 	if ok {
 		httpResp.Ok(res)
@@ -299,8 +299,9 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		if req.Method == "GET" || req.Method == "POST" || req.Method == "DELETE" {
+		if req.Method == http.MethodGet || req.Method == http.MethodPost || req.Method == http.MethodDelete {
 			next.ServeHTTP(res, req)
+			return
 		} else {
 			httpResp.BadRequest(res)
 			return
@@ -312,15 +313,15 @@ func HandleOther(next http.Handler) http.Handler {
  * Executor
  */
 
-func ChooseStorage(ctx context.Context) (model.Storable, error) {
+func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Storable, error) {
 	var storage model.Storable
-	if confModule.Config.Env.DB != "" || confModule.Config.Flag.DB != "" {
+	if conf.Env.DB != "" || conf.Flag.DB != "" {
 		pgPoolErr := &ErrorHandlers{
 			layer:          `Handlers`,
 			funcName:       `ChooseStorage`,
 			parentFuncName: `-`,
 		}
-		pgPool, err := db.Connect(ctx)
+		pgPool, err := db.Connect(ctx, conf)
 		if err != nil {
 			pgPoolErr.message = `failed connect to DB`
 			return &database.DBStorage{}, pgPoolErr
@@ -328,7 +329,7 @@ func ChooseStorage(ctx context.Context) (model.Storable, error) {
 		storage = &database.DBStorage{
 			ConnectionPool: pgPool,
 		}
-		err = database.PrepareDB()
+		err = database.PrepareDB(conf.Final.DB)
 		if err != nil {
 			return storage, fmt.Errorf(pgPoolErr.Error()+`%w`, err)
 		}
@@ -336,7 +337,7 @@ func ChooseStorage(ctx context.Context) (model.Storable, error) {
 		go storage.AsyncSaver()
 		return storage, nil
 	}
-	if confModule.Config.Env.LinkFile != `` || confModule.Config.Flag.LinkFile != `` {
+	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
 		pgFileErr := &ErrorHandlers{
 			layer:          `Handlers`,
 			funcName:       `ChooseStorage`,
@@ -344,7 +345,7 @@ func ChooseStorage(ctx context.Context) (model.Storable, error) {
 		}
 
 		storage = &files.FileStorage{}
-		err := files.MakeStorageFile(confModule.Config.Final.LinkFile)
+		err := files.MakeStorageFile(conf.Final.LinkFile)
 		if err != nil {
 			pgFileErr.message = `can't init file storage`
 			return storage, fmt.Errorf(pgFileErr.Error()+`: %w`, err)

@@ -31,15 +31,17 @@ type FileStorage struct {
 	ShortLink   string `json:"short_url"`
 	ID          string `json:"correlation_id"`
 	DeletedFlag bool   `json:"is_deleted"`
+	Cfg         confModule.OuterConfig
 	Ctx         context.Context
 }
 
-func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
+func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
 	jsonData.DeletedFlag = isDeleted
+	jsonData.Cfg = cfg
 }
 
 func (jsonData *FileStorage) Destroy() {
@@ -58,7 +60,6 @@ type inputOutputData struct {
 
 func (jsonData *FileStorage) Get() (string, bool, error) {
 
-	fileName := confModule.Config.Final.LinkFile
 	var savedData []inputOutputData
 	getErr := ErrorFile{
 		layer:          layer,
@@ -66,7 +67,7 @@ func (jsonData *FileStorage) Get() (string, bool, error) {
 		funcName:       `Get`,
 	}
 
-	jsonString, err := getData(fileName)
+	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
 	if err != nil {
 		getErr.message = `get data error`
 		return "", false, fmt.Errorf(getErr.Error()+`: %w`, err)
@@ -128,8 +129,6 @@ func getData(fileName string) (string, error) {
 
 func (jsonData *FileStorage) Set() error {
 
-	fileName := confModule.Config.Final.LinkFile
-
 	var toSave []inputOutputData
 	var savedData []inputOutputData
 
@@ -146,7 +145,7 @@ func (jsonData *FileStorage) Set() error {
 		DeletedFlag: jsonData.DeletedFlag,
 	}
 
-	jsonString, err := getData(fileName)
+	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
 	if err != nil {
 		errSet.message = `can't get data`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
@@ -166,9 +165,9 @@ func (jsonData *FileStorage) Set() error {
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	saveErr := saveData(content, fileName)
+	saveErr := saveData(content, jsonData.Cfg.Final.LinkFile)
 	if saveErr != nil {
-		errSet.message = `saving data in ` + fileName
+		errSet.message = `saving data in ` + jsonData.Cfg.Final.LinkFile
 		return fmt.Errorf(errSet.Error()+`: %w`, saveErr)
 	}
 	return nil
@@ -261,7 +260,7 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
+		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
 		savingData[i].ID = v.ID
 		savingData[i].ShortLink = shortLink
 
@@ -270,9 +269,8 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 
 	var savedData []FileStorage
 
-	fileName := confModule.Config.Final.LinkFile
 	var jsonString string
-	jsonString, err = getData(fileName)
+	jsonString, err = getData(jsonData.Cfg.Final.LinkFile)
 	if err != nil {
 		errBatchSet.message = `get data error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
@@ -291,7 +289,7 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
-	saveErr := saveData(content, fileName)
+	saveErr := saveData(content, jsonData.Cfg.Final.LinkFile)
 	if saveErr != nil {
 		errBatchSet.message = `can't save`
 		return []byte(""), fmt.Errorf(errBatchSet.Error()+`: %w`, saveErr)
@@ -320,8 +318,7 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	fileName := confModule.Config.Final.LinkFile
-	jsonString, err := getData(fileName)
+	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
 	if err != nil {
 		errHandleUserUrls.message = `get data error`
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)

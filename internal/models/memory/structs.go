@@ -30,14 +30,16 @@ type MemStorage struct {
 	DeletedFlag bool   `json:"is_deleted"`
 	Ctx         context.Context
 	Storage     memoryStorage.Storage
+	Cfg         confModule.OuterConfig
 }
 
-func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context) {
+func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
 	jsonData.DeletedFlag = isDeleted
+	jsonData.Cfg = cfg
 }
 
 func (jsonData *MemStorage) Destroy() {
@@ -129,7 +131,7 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(confModule.Config.Final.ShortURLAddr, v.ID)
+		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
 		savingData[i].ShortLink = shortLink
 		var toStore = memoryStorage.StorageItem{
 			Link:        savingData[i].Link,

@@ -24,13 +24,14 @@ func main() {
 
 	ctx := context.Background()
 
-	conf, err := confModule.HandleConfig()
+	var conf confModule.OuterConfig
+	err := conf.InitConfig(false)
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't handle config. "+err.Error())
 		return
 	}
 
-	storage, err := server.ChooseStorage(ctx)
+	storage, err := server.ChooseStorage(ctx, conf)
 	if err != nil {
 		var serverHandlersErr *server.ErrorHandlers
 		if errors.As(err, &serverHandlersErr) {
@@ -70,7 +71,7 @@ func main() {
 	})
 
 	logger.PrintLog(logger.INFO, "Starting newServ")
-	err = http.ListenAndServe(confModule.Config.Final.AppAddr, newServ.Routers)
+	err = http.ListenAndServe(conf.Final.AppAddr, newServ.Routers)
 	if err != nil {
 		logger.PrintLog(logger.FATAL, "Can't start newServ. "+err.Error())
 	}

@@ -2,18 +2,15 @@ package db
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"time"
 )
 
-func Connect(ctx context.Context) (*pgxpool.Pool, error) {
-	logger.PrintLog(logger.INFO, config.Config.Final.DB)
-	cfg, err := pgxpool.ParseConfig(config.Config.Final.DB)
+func Connect(ctx context.Context, conf config.OuterConfig) (*pgxpool.Pool, error) {
+	cfg, err := pgxpool.ParseConfig(conf.Final.DB)
 	if err != nil {
-		logger.PrintLog(logger.ERROR, `Can not parse config to DB. Connection failed`)
 		return nil, err
 	}
 	cfg.MaxConns = 16
