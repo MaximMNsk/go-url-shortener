@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -32,6 +33,11 @@ func TestConnect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
+
 			require.NoError(t, Err)
 			ctx := context.Background()
 			pgPool, err := Connect(ctx, Conf)

@@ -128,6 +128,8 @@ func TestHandleOther(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, nil)
+			require.NoError(t, err)
+
 			resp, err := http.DefaultClient.Do(request)
 
 			require.NoError(t, err)
@@ -168,6 +170,8 @@ func TestServer_HandlePing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, nil)
+			require.NoError(t, err)
+
 			resp, err := http.DefaultClient.Do(request)
 
 			require.NoError(t, err)
@@ -213,6 +217,8 @@ func TestServer_HandlePOST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			Link = tt.args.link
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, strings.NewReader(tt.args.link))
+			require.NoError(t, err)
+
 			resp, err := http.DefaultClient.Do(request)
 
 			require.NoError(t, err)
@@ -259,6 +265,8 @@ func TestServer_HandleGET(t *testing.T) {
 			time.Sleep(100 * time.Millisecond)
 			shortLinkID := sha1hash.Create(tt.args.link, 8)
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr+`/`+shortLinkID, nil)
+			require.NoError(t, err)
+
 			cl := http.DefaultClient
 			cl.CheckRedirect = requests.NoFollow
 			resp, err := cl.Do(request)

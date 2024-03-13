@@ -7,7 +7,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"strconv"
@@ -15,12 +14,10 @@ import (
 )
 
 var Conf config.OuterConfig
-var ConfErr error
 var Store DBStorage
-var PgPool pgxpool.Pool
 
 func TestDBStorage_Init(t *testing.T) {
-	ConfErr = Conf.InitConfig(true)
+	ConfErr := Conf.InitConfig(true)
 	PgPool, PgErr := db.Connect(context.Background(), Conf)
 	Store.ConnectionPool = PgPool
 
@@ -59,6 +56,10 @@ func TestDBStorage_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
 			userNumber := cookie.UserNum(`UserID`)
 			UserID, err := randomizer.RandDigitalBytes(3)
 			require.NoError(t, err)
@@ -97,6 +98,11 @@ func TestDBStorage_Ping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
+
 			res, err := tt.args.storage.Ping()
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.pingRes, res)
@@ -122,6 +128,11 @@ func TestPrepareDB(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
+
 			err := PrepareDB(Conf.Final.DB)
 			require.NoError(t, err)
 		})
@@ -191,6 +202,11 @@ func TestDBStorage_Set(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
+
 			Store.Link = tt.args.link
 			Store.ShortLink = tt.args.shortLink
 			Store.ID = tt.args.shortLink
@@ -230,6 +246,11 @@ func TestDBStorage_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+				assert.NotEmpty(t, Conf.Final.DB)
+				return
+			}
+
 			Store.Link = tt.args.link
 			Store.ShortLink = tt.args.shortLink
 			Store.ID = tt.args.shortLink
