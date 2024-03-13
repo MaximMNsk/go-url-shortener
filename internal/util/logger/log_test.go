@@ -43,14 +43,14 @@ func TestPrintLog(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r, _, err := os.Pipe()
+			r, w, err := os.Pipe()
 			rescueStdout := os.Stdout
-			r, w, _ := os.Pipe()
 			os.Stdout = w
 
 			PrintLog(tt.args.level, tt.args.message)
 
-			w.Close()
+			err = w.Close()
+			require.NoError(t, err)
 			out, _ := io.ReadAll(r)
 			os.Stdout = rescueStdout
 
@@ -59,5 +59,4 @@ func TestPrintLog(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-
 }

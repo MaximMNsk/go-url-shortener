@@ -7,6 +7,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 var Conf config.OuterConfig
 var ConfErr error
 var Store DBStorage
+var PgPool pgxpool.Pool
 
 func TestDBStorage_Init(t *testing.T) {
 	ConfErr = Conf.InitConfig(true)
@@ -58,9 +60,9 @@ func TestDBStorage_Init(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			userNumber := cookie.UserNum(`UserID`)
-			UserId, err := randomizer.RandDigitalBytes(3)
+			UserID, err := randomizer.RandDigitalBytes(3)
 			require.NoError(t, err)
-			ctx := context.WithValue(tt.args.ctx, userNumber, strconv.Itoa(UserId))
+			ctx := context.WithValue(tt.args.ctx, userNumber, strconv.Itoa(UserID))
 			require.NoError(t, ConfErr)
 			require.NoError(t, PgErr)
 			Store.Init(tt.args.link, tt.args.shortLink, tt.args.id, tt.args.isDeleted, ctx, Conf)
@@ -79,9 +81,6 @@ func TestDBStorage_Ping(t *testing.T) {
 		pingRes bool
 	}
 
-	PgPool, ErrDB := db.Connect(context.Background(), Conf)
-	defer PgPool.Close()
-
 	tests := []struct {
 		name string
 		args args
@@ -98,7 +97,6 @@ func TestDBStorage_Ping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, ErrDB)
 			res, err := tt.args.storage.Ping()
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.pingRes, res)

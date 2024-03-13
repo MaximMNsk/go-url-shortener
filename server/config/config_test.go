@@ -9,12 +9,12 @@ import (
 
 func TestHandleConfig(t *testing.T) {
 	type args struct {
-		envDb string
+		envDB string
 	}
 
 	type wants struct {
-		outputDbEnv     string
-		outputDbDefault string
+		outputDBEnv     string
+		outputDBDefault string
 	}
 
 	tests := []struct {
@@ -24,25 +24,25 @@ func TestHandleConfig(t *testing.T) {
 	}{
 		{
 			name: `Test env`,
-			args: args{envDb: `postgres://localhost`},
-			want: wants{outputDbDefault: `postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable`, outputDbEnv: `postgres://localhost`},
+			args: args{envDB: `postgres://localhost`},
+			want: wants{outputDBDefault: `postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable`, outputDBEnv: `postgres://localhost`},
 		},
 		{
 			name: `Test default`,
 			args: args{},
-			want: wants{outputDbDefault: `postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable`},
+			want: wants{outputDBDefault: `postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable`},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == `Test env` {
-				err := os.Setenv(`DATABASE_DSN`, tt.args.envDb)
+				err := os.Setenv(`DATABASE_DSN`, tt.args.envDB)
 				require.NoError(t, err)
 				var cfg OuterConfig
 				err = cfg.InitConfig(false)
 				require.NoError(t, err)
-				assert.Equal(t, tt.want.outputDbEnv, cfg.Final.DB)
+				assert.Equal(t, tt.want.outputDBEnv, cfg.Final.DB)
 			}
 		})
 	}
@@ -52,7 +52,7 @@ func TestHandleConfig(t *testing.T) {
 				var cfg OuterConfig
 				err := cfg.InitConfig(true)
 				require.NoError(t, err)
-				assert.Equal(t, tt.want.outputDbDefault, cfg.Final.DB)
+				assert.Equal(t, tt.want.outputDBDefault, cfg.Final.DB)
 			}
 		})
 	}

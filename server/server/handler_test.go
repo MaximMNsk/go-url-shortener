@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -41,8 +40,8 @@ func TestChooseStorage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Cfg.InitConfig(true)
 			require.NoError(t, err)
-			err = os.Setenv(`DATABASE_DSN`, Cfg.Final.DB)
-			require.NoError(t, err)
+			//err = os.Setenv(`DATABASE_DSN`, Cfg.Final.DB)
+			//require.NoError(t, err)
 			err = Cfg.InitConfig(false)
 			require.NoError(t, err)
 			Storage, err = ChooseStorage(context.Background(), Cfg)
@@ -133,6 +132,9 @@ func TestHandleOther(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.resp, resp.StatusCode)
+
+			err = resp.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -170,6 +172,9 @@ func TestServer_HandlePing(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.resp, resp.StatusCode)
+
+			err = resp.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -212,6 +217,9 @@ func TestServer_HandlePOST(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.resp, resp.StatusCode)
+
+			err = resp.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -259,6 +267,9 @@ func TestServer_HandleGET(t *testing.T) {
 
 			originalLink := resp.Header.Get(`Location`)
 			assert.Equal(t, tt.want.link, originalLink)
+
+			err = resp.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
