@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"fmt"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 )
+
+var Conf confModule.OuterConfig
+var ConfErr error
 
 func copyFile(src, dst string) (int64, error) {
 	sourceFileStat, err := os.Stat(src)
@@ -50,8 +54,7 @@ func restoreFile(source, dest string) error {
 }
 
 func TestJSONDataSet_Set(t *testing.T) {
-	config, _ := confModule.HandleConfig()
-
+	ConfErr = Conf.InitConfig(true)
 	type fields struct {
 		Link      string
 		ShortLink string
@@ -72,23 +75,23 @@ func TestJSONDataSet_Set(t *testing.T) {
 				ShortLink: "TestShortLink",
 				ID:        "TestID",
 			},
-			args: args{fileName: filepath.Join(config.Default.LinkFile)},
+			args: args{fileName: filepath.Join(Conf.Default.LinkFile)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jsonData := &FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
-			}
-			_ = jsonData.Set()
+			require.NoError(t, ConfErr)
+			jsonData := &FileStorage{}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background(), Conf)
+			err := jsonData.Set()
+			assert.NoError(t, err)
 			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
 }
 
 func TestJSONDataGet_Get(t *testing.T) {
+	ConfErr = Conf.InitConfig(true)
 	type fields struct {
 		Link      string
 		ShortLink string
@@ -111,8 +114,7 @@ func TestJSONDataGet_Get(t *testing.T) {
 				Link: "TestLink",
 			},
 			args: args{
-				fileName: filepath.Join(confModule.Config.Default.LinkFile),
-				//sourceFileName: "./test_source.json",
+				fileName: filepath.Join(Conf.Default.LinkFile),
 			},
 			want: want(FileStorage{
 				Link:      "TestLink",
@@ -124,12 +126,10 @@ func TestJSONDataGet_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			jsonData := FileStorage{
-				Link:      tt.fields.Link,
-				ShortLink: tt.fields.ShortLink,
-				ID:        tt.fields.ID,
-			}
-			link, _ := jsonData.Get()
+			jsonData := FileStorage{}
+			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background(), Conf)
+			link, _, err := jsonData.Get()
+			assert.NoError(t, err)
 			assert.EqualValues(t, tt.want.Link, link)
 		})
 	}
