@@ -25,3 +25,12 @@ func TestRandStringBytes(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkRandStringBytes(b *testing.B) {
+	count := 10000
+	b.Run(`RandStringBytes`, func(b *testing.B) {
+		for i := 0; i < count; i++ {
+			_ = RandStringBytes(20)
+		}
+	})
+}

@@ -367,58 +367,78 @@ func TestServer_HandlePOST_GET(t *testing.T) {
 	}
 }
 
-var links []string
-
-func BenchmarkServer_HandlePOST(b *testing.B) {
-	count := 1000
-
-	type Args struct {
-		addr   string
-		method string
-		link   string
-	}
-
-	for i := 0; i <= count; i++ {
-		args := Args{
-			addr:   Cfg.Final.AppAddr,
-			method: http.MethodPost,
-			link:   random.RandStringBytes(10),
-		}
-
-		links = append(links, args.link)
-		request, _ := http.NewRequest(args.method, `http://`+args.addr, strings.NewReader(args.link))
-		resp, _ := http.DefaultClient.Do(request)
-		_ = resp.Body.Close()
-
-	}
-	time.Sleep(1000 * time.Millisecond)
-}
-
-func BenchmarkServer_HandleGET(b *testing.B) {
-	type Args struct {
-		addr   string
-		method string
-		link   string
-	}
-
-	for _, link := range links {
-		args := Args{
-			addr:   Cfg.Final.AppAddr,
-			method: http.MethodPost,
-			link:   random.RandStringBytes(10),
-		}
-
-		shortLinkID := sha1hash.Create(link, 8)
-		request, _ := http.NewRequest(args.method, `http://`+args.addr+`/`+shortLinkID, nil)
-
-		client := &http.Client{
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				return http.ErrUseLastResponse
-			},
-		}
-		resp, _ := client.Do(request)
-		_ = resp.Header.Get(`Location`)
-
-		_ = resp.Body.Close()
-	}
-}
+//var links []string
+//
+//func BenchmarkServer_HandlePOST(b *testing.B) {
+//	count := 5
+//	_ = Cfg.InitConfig(true)
+//
+//	type Args struct {
+//		addr   string
+//		method string
+//		link   string
+//	}
+//
+//	Serv = NewServ(Cfg, Storage, context.Background())
+//	Serv.Routers = chi.NewRouter().With(HandleOther)
+//	Serv.Routers.Route(`/`, func(r chi.Router) {
+//		r.Get(`/`, Serv.HandleGET)
+//		r.Post(`/`, Serv.HandlePOST)
+//		r.Get(`/{query}`, Serv.HandleGET)
+//	})
+//	srv := http.Server{Addr: Cfg.Final.AppAddr, Handler: Serv.Routers}
+//
+//	b.Run(`Get`, func(b *testing.B) {
+//		go func() {
+//			_ = srv.ListenAndServe()
+//		}()
+//		time.Sleep(1000 * time.Millisecond)
+//		for i := 0; i <= count; i++ {
+//			args := Args{
+//				addr:   Cfg.Final.AppAddr,
+//				method: http.MethodPost,
+//				link:   random.RandStringBytes(10),
+//			}
+//
+//			links = append(links, args.link)
+//			request, _ := http.NewRequest(args.method, `http://`+args.addr, strings.NewReader(args.link))
+//			resp, _ := http.DefaultClient.Do(request)
+//			_ = resp.Body.Close()
+//
+//		}
+//	})
+//	time.Sleep(1000 * time.Millisecond)
+//}
+//
+//func BenchmarkServer_HandleGET(b *testing.B) {
+//	_ = Cfg.InitConfig(true)
+//
+//	type Args struct {
+//		addr   string
+//		method string
+//		link   string
+//	}
+//
+//	b.Run(`Get`, func(b *testing.B) {
+//		for _, link := range links {
+//			args := Args{
+//				addr:   Cfg.Final.AppAddr,
+//				method: http.MethodPost,
+//				link:   random.RandStringBytes(10),
+//			}
+//
+//			shortLinkID := sha1hash.Create(link, 8)
+//			request, _ := http.NewRequest(args.method, `http://`+args.addr+`/`+shortLinkID, nil)
+//
+//			client := &http.Client{
+//				CheckRedirect: func(req *http.Request, via []*http.Request) error {
+//					return http.ErrUseLastResponse
+//				},
+//			}
+//			resp, _ := client.Do(request)
+//			_ = resp.Header.Get(`Location`)
+//
+//			_ = resp.Body.Close()
+//		}
+//	})
+//}
