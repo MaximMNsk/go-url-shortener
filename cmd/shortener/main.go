@@ -11,6 +11,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"net/http/pprof"
 )
 
 /**
@@ -55,6 +56,11 @@ func main() {
 		With(compress.GzipHandler).
 		With(server.HandleOther)
 	newServ.Routers.Route("/", func(r chi.Router) {
+		newServ.Routers.Group(func(r chi.Router) {
+			r.HandleFunc("/debug/pprof/*", pprof.Index)
+			r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			r.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		})
 		newServ.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthSetter)
 			r.Post(`/`, newServ.HandlePOST)

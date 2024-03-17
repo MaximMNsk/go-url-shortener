@@ -33,6 +33,7 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 		c.w.Header().Set("Content-Encoding", "gzip")
 	}
 	c.w.WriteHeader(statusCode)
+	c.zw.Reset(c.w)
 }
 
 func (c *compressWriter) Close() error {
@@ -56,7 +57,7 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
-func (c compressReader) Read(p []byte) (n int, err error) {
+func (c *compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
@@ -79,7 +80,8 @@ func GzipHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		ow := w
+		//ow := w
+		var ow http.ResponseWriter
 
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")

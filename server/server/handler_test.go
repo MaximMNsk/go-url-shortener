@@ -84,7 +84,7 @@ func TestNewServ(t *testing.T) {
 			go func() {
 				_ = srv.ListenAndServe()
 			}()
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(2 * time.Second)
 		})
 	}
 }
@@ -279,5 +279,90 @@ func TestServer_HandleGET(t *testing.T) {
 			err = resp.Body.Close()
 			require.NoError(t, err)
 		})
+	}
+}
+
+func TestServer_HandlePOST_GET(t *testing.T) {
+	var link string
+	var count = 10
+
+	type args struct {
+		addr   string
+		method string
+		link   string
+	}
+	type want struct {
+		resp int
+		link string
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Set`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				link:   random.RandStringBytes(10),
+			},
+			want: want{
+				resp: http.StatusCreated,
+			},
+		},
+		{
+			name: `Test Get`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodGet,
+				link:   link,
+			},
+			want: want{
+				resp: http.StatusTemporaryRedirect,
+				link: link,
+			},
+		},
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	for i := 0; i <= count; i++ {
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+
+				if tt.name == `Test Set` {
+					link = tt.args.link
+					request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, strings.NewReader(tt.args.link))
+					require.NoError(t, err)
+
+					resp, err := http.DefaultClient.Do(request)
+
+					require.NoError(t, err)
+					assert.Equal(t, tt.want.resp, resp.StatusCode)
+
+					err = resp.Body.Close()
+					require.NoError(t, err)
+				}
+
+				if tt.name == `Test Get` {
+					time.Sleep(100 * time.Millisecond)
+					shortLinkID := sha1hash.Create(link, 8)
+					request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr+`/`+shortLinkID, nil)
+					require.NoError(t, err)
+
+					client := http.DefaultClient
+					client.CheckRedirect = requests.NoFollow
+					resp, err := client.Do(request)
+					require.NoError(t, err)
+					assert.Equal(t, tt.want.resp, resp.StatusCode)
+
+					originalLink := resp.Header.Get(`Location`)
+					assert.Equal(t, link, originalLink)
+
+					err = resp.Body.Close()
+					require.NoError(t, err)
+				}
+			})
+		}
 	}
 }
