@@ -12,7 +12,7 @@ type Storage struct {
 }
 
 func (s *Storage) Init() {
-	//s.data = make(map[string]StorageItem)
+	s.data = make([]StorageItem, 0)
 }
 
 func (s *Storage) Set(data StorageItem) {

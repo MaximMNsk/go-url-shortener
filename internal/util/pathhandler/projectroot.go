@@ -8,6 +8,7 @@ import (
 func ProjectRoot() (string, error) {
 	currentPath := ""
 	var err error
+
 	for i := 0; i < 9; i++ {
 		currentPath, err = os.Getwd()
 		if err == nil {

@@ -205,7 +205,7 @@ func TestServer_HandlePOST(t *testing.T) {
 			args: args{
 				addr:   Cfg.Final.AppAddr,
 				method: http.MethodPost,
-				link:   random.RandStringBytes(10),
+				link:   random.StringBytes(10),
 			},
 			want: want{
 				resp: http.StatusCreated,
@@ -305,7 +305,7 @@ func TestServer_HandlePOST_GET(t *testing.T) {
 			args: args{
 				addr:   Cfg.Final.AppAddr,
 				method: http.MethodPost,
-				link:   random.RandStringBytes(10),
+				link:   random.StringBytes(10),
 			},
 			want: want{
 				resp: http.StatusCreated,

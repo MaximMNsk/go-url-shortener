@@ -4,10 +4,6 @@ import (
 	"net/http"
 )
 
-/**
- * Responses
- */
-
 type Additional struct {
 	Place     string
 	OuterData string

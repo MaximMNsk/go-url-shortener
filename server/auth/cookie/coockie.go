@@ -43,6 +43,7 @@ func AuthSetter(next http.Handler) http.Handler {
 				http.SetCookie(w, cookie)
 			}
 		}
+
 		userNumber := UserNum(`UserID`)
 		ctx := context.WithValue(r.Context(), userNumber, strconv.Itoa(UserID))
 		newReqCtx := r.WithContext(ctx)

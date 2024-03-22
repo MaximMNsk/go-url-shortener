@@ -176,8 +176,8 @@ var Link string
 var ShortLink string
 
 func TestDBStorage_Set(t *testing.T) {
-	Link = rand.RandStringBytes(10)
-	ShortLink = rand.RandStringBytes(10)
+	Link = rand.StringBytes(10)
+	ShortLink = rand.StringBytes(10)
 
 	type args struct {
 		link      string

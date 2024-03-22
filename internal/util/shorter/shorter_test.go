@@ -41,7 +41,7 @@ func BenchmarkGetShortURL(b *testing.B) {
 	b.Run(`GetShortURL`, func(b *testing.B) {
 		args := args{
 			addr:   Cfg.Final.AppAddr,
-			linkID: random.RandStringBytes(10),
+			linkID: random.StringBytes(10),
 		}
 		for i := 0; i < count; i++ {
 			_ = GetShortURL(args.addr, args.linkID)
