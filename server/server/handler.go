@@ -124,7 +124,7 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 
 	ctrl := chi.URLParam(req, "query")
 
-	availableCurls := make(controllers)
+	availableCurls := make(controllers, 3)
 	availableCurls["shorten"] = true
 	availableCurls["batch"] = true
 	availableCurls["urls"] = true
