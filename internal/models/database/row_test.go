@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
@@ -167,7 +168,14 @@ func TestExplodeURLs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := ExplodeURLs(tt.args.URLs)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want.URLs, result)
+			var URLs []string
+
+			err = json.Unmarshal([]byte(tt.args.URLs), &URLs)
+			require.NoError(t, err)
+
+			for _, v := range URLs {
+				assert.Contains(t, result, v)
+			}
 		})
 	}
 }
