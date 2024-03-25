@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
+	"time"
 )
 
 type ErrorDB struct {
@@ -383,6 +384,7 @@ func (jsonData *DBStorage) AsyncSaver() {
 
 	for {
 		if toDeleteCh == nil {
+			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		select {
@@ -399,6 +401,7 @@ func (jsonData *DBStorage) AsyncSaver() {
 				continue
 			}
 		default:
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }

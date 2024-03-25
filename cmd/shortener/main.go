@@ -14,12 +14,7 @@ import (
 	"net/http/pprof"
 )
 
-/**
- * Request type handlers
- */
-
 func main() {
-
 	logger.PrintLog(logger.INFO, "Start newServ")
 	logger.PrintLog(logger.INFO, "Handle config")
 
