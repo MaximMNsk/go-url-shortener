@@ -5,11 +5,13 @@ import (
 	"os"
 )
 
-const INFO = "INFO"
-const DEBUG = "DEBUG"
-const WARN = "WARN"
-const ERROR = "ERROR"
-const FATAL = "FATAL"
+const (
+	INFO  = "INFO"
+	DEBUG = "DEBUG"
+	WARN  = "WARN"
+	ERROR = "ERROR"
+	FATAL = "FATAL"
+)
 
 func PrintLog(level string, message string) {
 	switch level {

@@ -1,9 +1,10 @@
 package memorystorage
 
 type StorageItem struct {
-	Link      string
-	ShortLink string
-	ID        string
+	Link        string
+	ShortLink   string
+	ID          string
+	DeletedFlag bool
 }
 
 type Storage struct {
@@ -11,7 +12,7 @@ type Storage struct {
 }
 
 func (s *Storage) Init() {
-	//s.data = make(map[string]StorageItem)
+	s.data = make([]StorageItem, 0)
 }
 
 func (s *Storage) Set(data StorageItem) {
