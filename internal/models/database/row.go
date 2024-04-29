@@ -32,6 +32,20 @@ func (e *ErrorDB) Error() string {
 
 const layer = `DB`
 
+// DBStorage - структура объекта, который создается при инициализации
+// и используется для взаимодействия с хранилищем.
+//
+// Данные передаются в полях объекта.
+//
+// Состоит из:
+// Ctx - контекст запроса.
+// Link - исходная ссылка, которую необходимо сократить.
+// ShortLink - результат сокращения.
+// ID - идентификатор сокращенной ссылки без имени хоста.
+// DeletedFlag - признак наличия УРЛ в хранилище.
+// ToDeleteCh - канал для массового удаления УРЛ.
+// ConnectionPool - пул, из которого выбирается соединение для работы с хранилищем.
+// Cfg - конфигурация, которая инициализируется при запуске.
 type DBStorage struct {
 	Ctx            context.Context
 	Link           string `json:"original_url"`
@@ -43,6 +57,7 @@ type DBStorage struct {
 	Cfg            confModule.OuterConfig
 }
 
+// Init - метод создает для каждого запроса объект.
 func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.Ctx = ctx
 	jsonData.ID = id
@@ -52,6 +67,7 @@ func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx 
 	jsonData.Cfg = cfg
 }
 
+// Destroy - метод утилизирует объект для работы с хранилищем.
 func (jsonData *DBStorage) Destroy() {
 	db.Close(jsonData.ConnectionPool)
 }
@@ -78,6 +94,7 @@ update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 const updateRowNoUser = `
 update public.short_links set is_deleted = true where uid = $1`
 
+// PrepareDB - подготавливает хранилище, выполняет миграции.
 func PrepareDB(dsn string) error {
 
 	prepareErr := ErrorDB{
@@ -105,6 +122,7 @@ func PrepareDB(dsn string) error {
 	return nil
 }
 
+// Ping - метод для проверки работоспособности хранилища.
 func (jsonData *DBStorage) Ping() (bool, error) {
 
 	err := jsonData.ConnectionPool.Ping(jsonData.Ctx)
@@ -120,6 +138,10 @@ func (jsonData *DBStorage) Ping() (bool, error) {
 	return true, nil
 }
 
+// Get - возвращает инфо о сохраненном и сокращенном УРЛ.
+// Первый возвращаемый параметр - сокращенный УРЛ,
+// второй - флаг присутствия,
+// третий - ошибка выполнения.
 func (jsonData *DBStorage) Get() (string, bool, error) {
 	getErr := ErrorDB{
 		layer:          layer,
@@ -173,6 +195,8 @@ func getData(data DBStorage) (DBStorage, error) {
 	return selected, nil
 }
 
+// Set - сохраняет и сокращает УРЛ.
+// Возвращает статус работы в виде ошибки.
 func (jsonData *DBStorage) Set() error {
 
 	errSet := ErrorDB{
@@ -234,6 +258,8 @@ type outputBatch struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// BatchSet - сохраняет и сокращает УРЛ пакетно.
+// Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
 func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	var savingData []DBStorage
@@ -303,6 +329,8 @@ type JSONCutted struct {
 	ShortLink string `json:"short_url"`
 }
 
+// HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
+// Так же возвращает результат обработки запроса.
 func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	var batchResp []JSONCutted
 
@@ -359,6 +387,8 @@ type DeleteItem struct {
 
 var toDeleteCh chan DeleteItem
 
+// HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
+// Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
 func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
 
@@ -372,6 +402,8 @@ func (jsonData *DBStorage) HandleUserUrlsDelete() {
 	}()
 }
 
+// AsyncSaver - метод-демон, который работает асинхронно.
+// Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (jsonData *DBStorage) AsyncSaver() {
 	toDeleteCh = make(chan DeleteItem)
 	defer close(toDeleteCh)

@@ -1,3 +1,4 @@
+// Package config - пакет для работы с параметрами конфигурации.
 package config
 
 import (
@@ -13,6 +14,7 @@ import (
 const localHost = "http://localhost"
 const localPort = "8080"
 
+// OuterConfig - структура объекта конфигурации.
 type OuterConfig struct {
 	Default struct {
 		AppAddr      string
@@ -40,15 +42,8 @@ type OuterConfig struct {
 	}
 }
 
-/** TODO delete global var. Make methods from all func */
-//var Config OuterConfig
-
-/**
- * Config handlers
- */
-
 // parseFlags обрабатывает аргументы командной строки
-// и сохраняет их значения в соответствующих переменных
+// и сохраняет их значения в соответствующих переменных.
 func (config *OuterConfig) parseFlags() {
 	flag.StringVar(&config.Flag.AppAddr, "a", "", "address and port to run server")
 	flag.StringVar(&config.Flag.ShortURLAddr, "b", "", "address and port to short link")
@@ -57,6 +52,8 @@ func (config *OuterConfig) parseFlags() {
 	flag.Parse()
 }
 
+// handleFinal финализирует подготовку объекта конфигурации.
+// Выполняется после инициализации и получения параметров.
 func (config *OuterConfig) handleFinal() error {
 	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
 	aHost, aPort, err := net.SplitHostPort(config.Final.AppAddr)
@@ -74,6 +71,7 @@ func (config *OuterConfig) handleFinal() error {
 	return err
 }
 
+// setDefaults - устанавливает умолчательные значения.
 func (config *OuterConfig) setDefaults() error {
 	config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
 	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
@@ -84,11 +82,14 @@ func (config *OuterConfig) setDefaults() error {
 	return err
 }
 
+// parseEnv обрабатывает переменные окружения
+// и сохраняет их значения в соответствующих переменных.
 func (config *OuterConfig) parseEnv() error {
 	err := env.Parse(&config.Env)
 	return err
 }
 
+// InitConfig - инициализация объекта конфигурации.
 func (config *OuterConfig) InitConfig(testMode bool) error {
 
 	err := config.setDefaults()

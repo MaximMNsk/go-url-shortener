@@ -1,3 +1,4 @@
+// Package server - слой обработчиков запросов от фронта.
 package server
 
 import (
@@ -17,11 +18,13 @@ import (
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"net/http"
 )
 
+// ErrorHandlers - тип для работы с ошибками слоя обработчиков.
 type ErrorHandlers struct {
 	layer          string
 	parentFuncName string
@@ -33,21 +36,22 @@ func (e *ErrorHandlers) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
+// HandleGET - метод получения URL из ShortURL.
 func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 
-	// Пришел ид
+	// Пришел ид.
 	requestID := req.URL.Path[1:]
 
 	s.Storage.Init(``, ``, requestID, false, req.Context(), s.Config)
 	saved, deleted, err := s.Storage.Get()
-	// 400
+	// 400.
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Get exception: "+err.Error())
 		httpResp.BadRequest(res)
 		return
 	}
 
-	// 410
+	// 410.
 	if deleted {
 		logger.PrintLog(logger.INFO, "Current item was deleted")
 		httpResp.Gone(res, httpResp.Additional{})
@@ -60,20 +64,18 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 			OuterData: "Location",
 			InnerData: saved,
 		}
-		// Если есть, отдаем 307 редирект
-		logger.PrintLog(logger.INFO, "Success")
+		// Если есть, отдаем 307 редирект.
+		//logger.PrintLog(logger.INFO, "Success")
 		httpResp.TempRedirect(res, additional)
 		return
 	}
 
-	// Если нет, отдаем BadRequest
+	// Если нет, отдаем BadRequest 400.
 	logger.PrintLog(logger.WARN, "Not success")
 	httpResp.BadRequest(res)
 }
 
-/**
- * Обработка POST
- */
+// HandlePOST - принимает запрос, наполняет объект данными, выполняет запрос к хранилищу.
 func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 
 	contentBody, errBody := io.ReadAll(req.Body)
@@ -104,7 +106,7 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 	if setErr != nil {
 		var pgErrType *pgconn.PgError
 		if errors.As(setErr, &pgErrType) {
-			if pgErrType.Code == `23505` {
+			if pgErrType.Code == pgerrcode.UniqueViolation {
 				logger.PrintLog(logger.WARN, "Can not set link data: "+setErr.Error())
 				httpResp.Conflict(res, additional)
 				return
@@ -114,12 +116,14 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		httpResp.BadRequest(res)
 		return
 	}
-	// Отдаем 201 ответ с шортлинком
+	// Отдаем 201 ответ с шортлинком.
 	httpResp.Created(res, additional)
 }
 
 type controllers map[string]bool
 
+// HandleAPI - принимает и маршрутизирует API запросы.
+// В зависимости от контроллера запроса и метода вызывает соответствующую функцию обработки.
 func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 
 	ctrl := chi.URLParam(req, "query")
@@ -154,6 +158,8 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// HandleAPIUserUrlsDelete - функция метода HandleAPI, агрегирующая логику удаления пакета URL через API.
+// Работает для конкретного пользователя.
 func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Server) {
 	contentBody, errBody := io.ReadAll(req.Body)
 	defer req.Body.Close()
@@ -167,6 +173,8 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	s.Storage.HandleUserUrlsDelete()
 }
 
+// HandleAPIUserUrls - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
+// Работает для конкретного пользователя.
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
 	s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
@@ -189,6 +197,7 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 	httpResp.OkAdditionalJSON(res, additional)
 }
 
+// HandleAPIBatch - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
 func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 
 	contentBody, errBody := io.ReadAll(req.Body)
@@ -228,6 +237,7 @@ type output struct {
 	Result string `json:"result"`
 }
 
+// HandleAPIShorten - функция метода HandleAPI, агрегирующая логику обработки одного URL через API.
 func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 
 	contentBody, errBody := io.ReadAll(req.Body)
@@ -237,7 +247,6 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	// Пришел урл, парсим его
 	var apiData input
 	err := json.Unmarshal(contentBody, &apiData)
 	if err != nil {
@@ -280,6 +289,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	httpResp.CreatedJSON(res, additional)
 }
 
+// HandlePing - метод сервера для проверки доступности хранилища.
 func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	handlePingErr := &ErrorHandlers{
 		layer:          `Handlers`,
@@ -297,6 +307,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	httpResp.InternalError(res)
 }
 
+// HandleOther - middleware для обработки неожидаемых запросов.
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		if req.Method == http.MethodGet || req.Method == http.MethodPost || req.Method == http.MethodDelete {
@@ -309,10 +320,9 @@ func HandleOther(next http.Handler) http.Handler {
 	})
 }
 
-/**
- * Executor
- */
-
+// ChooseStorage - метод выбора хранилища в зависимости от параметров конфигурации.
+// Работает с конфигурацией, которую принимает вторым параметром.
+// Возвращает модель для работы с хранилищем и ошибку.
 func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Storable, error) {
 	var storage model.Storable
 	if conf.Env.DB != "" || conf.Flag.DB != "" {
@@ -358,6 +368,7 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 	return storage, nil
 }
 
+// Server - основная структура сервера, определяющая его работу.
 type Server struct {
 	Storage model.Storable
 	Routers chi.Router
@@ -365,6 +376,8 @@ type Server struct {
 	Context context.Context
 }
 
+// NewServ - создает новый сервер.
+// Параметрами передаются конфигурация, модель сохранения, контекст для сервера.
 func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
 	return Server{Storage: s, Config: c, Context: ctx}
 }

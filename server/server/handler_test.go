@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	model "github.com/MaximMNsk/go-url-shortener/internal/models/interface/models"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	random "github.com/MaximMNsk/go-url-shortener/internal/util/rand"
@@ -40,8 +41,6 @@ func TestChooseStorage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Cfg.InitConfig(true)
 			require.NoError(t, err)
-			//err = os.Setenv(`DATABASE_DSN`, Cfg.Final.DB)
-			//require.NoError(t, err)
 			err = Cfg.InitConfig(false)
 			require.NoError(t, err)
 			Storage, err = ChooseStorage(context.Background(), Cfg)
@@ -140,6 +139,12 @@ func TestHandleOther(t *testing.T) {
 		})
 	}
 }
+func ExampleHandleOther() {
+	request, _ := http.NewRequest(http.MethodPut, `http://localhost:8080/`, nil)
+	response, _ := http.DefaultClient.Do(request)
+	fmt.Println(response.StatusCode)
+	// Output: 400
+}
 
 func TestServer_HandlePing(t *testing.T) {
 	type args struct {
@@ -181,6 +186,13 @@ func TestServer_HandlePing(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func ExampleServer_HandlePing() {
+	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
+	response, _ := http.DefaultClient.Do(request)
+	fmt.Println(response.StatusCode)
+	// Output: 200
 }
 
 var Link string
@@ -228,6 +240,14 @@ func TestServer_HandlePOST(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func ExampleServer_HandlePOST() {
+	body := strings.NewReader(`ya.ru`)
+	request, _ := http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
+	response, _ := http.DefaultClient.Do(request)
+	fmt.Println(response.StatusCode)
+	// Output: 201
 }
 
 func TestServer_HandleGET(t *testing.T) {
@@ -280,6 +300,20 @@ func TestServer_HandleGET(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func ExampleServer_HandleGET() {
+	shortLinkID := sha1hash.Create(`ya.ru`, 8)
+	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	client := http.DefaultClient
+	client.CheckRedirect = requests.NoFollow
+	response, _ := client.Do(request)
+
+	fmt.Println(response.StatusCode)
+	fmt.Println(response.Header.Get(`Location`))
+	// Output:
+	// 307
+	// ya.ru
 }
 
 func TestServer_HandlePOST_GET(t *testing.T) {
@@ -366,79 +400,3 @@ func TestServer_HandlePOST_GET(t *testing.T) {
 		}
 	}
 }
-
-//var links []string
-//
-//func BenchmarkServer_HandlePOST(b *testing.B) {
-//	count := 5
-//	_ = Cfg.InitConfig(true)
-//
-//	type Args struct {
-//		addr   string
-//		method string
-//		link   string
-//	}
-//
-//	Serv = NewServ(Cfg, Storage, context.Background())
-//	Serv.Routers = chi.NewRouter().With(HandleOther)
-//	Serv.Routers.Route(`/`, func(r chi.Router) {
-//		r.Get(`/`, Serv.HandleGET)
-//		r.Post(`/`, Serv.HandlePOST)
-//		r.Get(`/{query}`, Serv.HandleGET)
-//	})
-//	srv := http.Server{Addr: Cfg.Final.AppAddr, Handler: Serv.Routers}
-//
-//	b.Run(`Get`, func(b *testing.B) {
-//		go func() {
-//			_ = srv.ListenAndServe()
-//		}()
-//		time.Sleep(1000 * time.Millisecond)
-//		for i := 0; i <= count; i++ {
-//			args := Args{
-//				addr:   Cfg.Final.AppAddr,
-//				method: http.MethodPost,
-//				link:   random.RandStringBytes(10),
-//			}
-//
-//			links = append(links, args.link)
-//			request, _ := http.NewRequest(args.method, `http://`+args.addr, strings.NewReader(args.link))
-//			resp, _ := http.DefaultClient.Do(request)
-//			_ = resp.Body.Close()
-//
-//		}
-//	})
-//	time.Sleep(1000 * time.Millisecond)
-//}
-//
-//func BenchmarkServer_HandleGET(b *testing.B) {
-//	_ = Cfg.InitConfig(true)
-//
-//	type Args struct {
-//		addr   string
-//		method string
-//		link   string
-//	}
-//
-//	b.Run(`Get`, func(b *testing.B) {
-//		for _, link := range links {
-//			args := Args{
-//				addr:   Cfg.Final.AppAddr,
-//				method: http.MethodPost,
-//				link:   random.RandStringBytes(10),
-//			}
-//
-//			shortLinkID := sha1hash.Create(link, 8)
-//			request, _ := http.NewRequest(args.method, `http://`+args.addr+`/`+shortLinkID, nil)
-//
-//			client := &http.Client{
-//				CheckRedirect: func(req *http.Request, via []*http.Request) error {
-//					return http.ErrUseLastResponse
-//				},
-//			}
-//			resp, _ := client.Do(request)
-//			_ = resp.Header.Get(`Location`)
-//
-//			_ = resp.Body.Close()
-//		}
-//	})
-//}

@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// Connect - создает пул подключений к БД.
+// Использует данные из переданной конфигурации.
 func Connect(ctx context.Context, conf config.OuterConfig) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(conf.Final.DB)
 	if err != nil {
@@ -24,6 +26,7 @@ func Connect(ctx context.Context, conf config.OuterConfig) (*pgxpool.Pool, error
 	return database, err
 }
 
+// Close - закрывает переданный пул подключений.
 func Close(DB *pgxpool.Pool) {
 	DB.Close()
 }
