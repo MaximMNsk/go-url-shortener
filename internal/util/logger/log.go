@@ -5,18 +5,20 @@ import (
 	"os"
 )
 
-const (
-	// INFO уровень логирования.
-	INFO = "INFO"
-	// DEBUG уровень логирования.
-	DEBUG = "DEBUG"
-	// WARN уровень логирования.
-	WARN = "WARN"
-	// ERROR уровень логирования.
-	ERROR = "ERROR"
-	// FATAL уровень логирования.
-	FATAL = "FATAL"
-)
+// INFO уровень логирования.
+const INFO = "INFO"
+
+// DEBUG уровень логирования.
+const DEBUG = "DEBUG"
+
+// WARN уровень логирования.
+const WARN = "WARN"
+
+// ERROR уровень логирования.
+const ERROR = "ERROR"
+
+// FATAL уровень логирования.
+const FATAL = "FATAL"
 
 // PrintLog - формирует форматированный вывод лога.
 func PrintLog(level string, message string) {

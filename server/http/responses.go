@@ -4,6 +4,7 @@ import (
 	"net/http"
 )
 
+// Additional - структура для передачи дополнительных данных для ответа сервера.
 type Additional struct {
 	Place     string
 	OuterData string
