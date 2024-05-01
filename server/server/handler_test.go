@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -142,7 +143,9 @@ func TestHandleOther(t *testing.T) {
 func ExampleHandleOther() {
 	request, _ := http.NewRequest(http.MethodPut, `http://localhost:8080/`, nil)
 	response, _ := http.DefaultClient.Do(request)
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(response.Body)
 	fmt.Println(response.StatusCode)
 	// Output: 400
 }
@@ -192,7 +195,9 @@ func TestServer_HandlePing(t *testing.T) {
 func ExampleServer_HandlePing() {
 	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
 	response, _ := http.DefaultClient.Do(request)
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(response.Body)
 	fmt.Println(response.StatusCode)
 	// Output: 200
 }
@@ -248,7 +253,9 @@ func ExampleServer_HandlePOST() {
 	body := strings.NewReader(`ya.ru`)
 	request, _ := http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
 	response, _ := http.DefaultClient.Do(request)
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(response.Body)
 	fmt.Println(response.StatusCode)
 	// Output: 201
 }
@@ -311,7 +318,9 @@ func ExampleServer_HandleGET() {
 	client := http.DefaultClient
 	client.CheckRedirect = requests.NoFollow
 	response, _ := client.Do(request)
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(response.Body)
 
 	fmt.Println(response.StatusCode)
 	fmt.Println(response.Header.Get(`Location`))
