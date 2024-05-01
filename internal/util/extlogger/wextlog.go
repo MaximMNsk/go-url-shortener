@@ -1,3 +1,4 @@
+// Package extlogger - middleware для перехвата и записи логов запроса.
 package extlogger
 
 import (
@@ -11,10 +12,12 @@ import (
 	"time"
 )
 
-type Header http.Header
+// Header
+//type Header http.Header
 
+// ResponseWriter - интерфейс, который определяет структуру пакета.
 type ResponseWriter interface {
-	Header() Header
+	//Header() Header
 	Write([]byte) (int, error)
 	WriteHeader(statusCode int)
 }
@@ -33,20 +36,23 @@ type (
 	}
 )
 
+// Write - записывает ответ, используя оригинальный ResponseWriter,
+// возвращает размер записанных данных и ошибку.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	// записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
 	// захватываем размер
 	r.responseData.size += size
 	return size, err
 }
 
+// WriteHeader - записывает код статуса, используя оригинальный ResponseWriter
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	// записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
 	// захватываем код статуса
 	r.responseData.status = statusCode
 }
+
+// Log - непосредственно, метод логирования на базе zerolog.
 func Log(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		log := zerolog.New(os.Stdout).With().

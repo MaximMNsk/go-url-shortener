@@ -6,13 +6,19 @@ import (
 )
 
 const (
-	INFO  = "INFO"
+	// INFO уровень логирования.
+	INFO = "INFO"
+	// DEBUG уровень логирования.
 	DEBUG = "DEBUG"
-	WARN  = "WARN"
+	// WARN уровень логирования.
+	WARN = "WARN"
+	// ERROR уровень логирования.
 	ERROR = "ERROR"
+	// FATAL уровень логирования.
 	FATAL = "FATAL"
 )
 
+// PrintLog - формирует форматированный вывод лога.
 func PrintLog(level string, message string) {
 	switch level {
 	case INFO:

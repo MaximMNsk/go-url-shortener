@@ -10,12 +10,13 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 )
 
+// UserNum - тип для номера пользователя.
 type UserNum string
 
+// AuthSetter - устанавливает куки для авторизованного пользователя.
 func AuthSetter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, err := r.Cookie("token")
@@ -37,7 +38,7 @@ func AuthSetter(next http.Handler) http.Handler {
 				cookie := &http.Cookie{
 					Name:    `token`,
 					Value:   newToken,
-					Expires: time.Now().Add(TokenExp),
+					Expires: time.Now().Add(tokenExp),
 					Path:    `/`,
 				}
 				http.SetCookie(w, cookie)
@@ -51,6 +52,7 @@ func AuthSetter(next http.Handler) http.Handler {
 	})
 }
 
+// AuthChecker - проверяет куки пользователя.
 func AuthChecker(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := r.Cookie("token")
@@ -74,50 +76,50 @@ func AuthChecker(next http.Handler) http.Handler {
 	})
 }
 
-func AuthHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := r.Cookie("token")
-		if err != nil && strings.Contains(err.Error(), `not present`) {
-			logger.PrintLog(logger.WARN, err.Error())
-			UserID, err := randomizer.RandDigitalBytes(3)
-			logInfo := fmt.Sprintf("Set userID: %d", UserID)
-			logger.PrintLog(logger.INFO, logInfo)
-			if err != nil {
-				logger.PrintLog(logger.WARN, err.Error())
-			}
-			newToken, err := BuildJWTString(UserID)
-			if err != nil {
-				logger.PrintLog(logger.WARN, err.Error())
-			}
-			logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
-			cookie := &http.Cookie{
-				Name:    `token`,
-				Value:   newToken,
-				Expires: time.Now().Add(TokenExp),
-				Path:    `/`,
-			}
-			http.SetCookie(w, cookie)
-			userNumber := UserNum(`UserID`)
-			ctx := context.WithValue(r.Context(), userNumber, UserID)
-			newReqCtx := r.WithContext(ctx)
-			next.ServeHTTP(w, newReqCtx)
-			return
-		}
-
-		logger.PrintLog(logger.INFO, "Token: "+token.Value)
-		UserID := GetUserID(token.Value)
-
-		if UserID > 0 {
-			userNumber := UserNum(`UserID`)
-			ctx := context.WithValue(r.Context(), userNumber, UserID)
-			newReqCtx := r.WithContext(ctx)
-			next.ServeHTTP(w, newReqCtx)
-			return
-		}
-		additional := httpResp.Additional{}
-		httpResp.Unauthorized(w, additional)
-	})
-}
+//func AuthHandler(next http.Handler) http.Handler {
+//	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//		token, err := r.Cookie("token")
+//		if err != nil && strings.Contains(err.Error(), `not present`) {
+//			logger.PrintLog(logger.WARN, err.Error())
+//			UserID, err := randomizer.RandDigitalBytes(3)
+//			logInfo := fmt.Sprintf("Set userID: %d", UserID)
+//			logger.PrintLog(logger.INFO, logInfo)
+//			if err != nil {
+//				logger.PrintLog(logger.WARN, err.Error())
+//			}
+//			newToken, err := BuildJWTString(UserID)
+//			if err != nil {
+//				logger.PrintLog(logger.WARN, err.Error())
+//			}
+//			logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
+//			cookie := &http.Cookie{
+//				Name:    `token`,
+//				Value:   newToken,
+//				Expires: time.Now().Add(TokenExp),
+//				Path:    `/`,
+//			}
+//			http.SetCookie(w, cookie)
+//			userNumber := UserNum(`UserID`)
+//			ctx := context.WithValue(r.Context(), userNumber, UserID)
+//			newReqCtx := r.WithContext(ctx)
+//			next.ServeHTTP(w, newReqCtx)
+//			return
+//		}
+//
+//		logger.PrintLog(logger.INFO, "Token: "+token.Value)
+//		UserID := GetUserID(token.Value)
+//
+//		if UserID > 0 {
+//			userNumber := UserNum(`UserID`)
+//			ctx := context.WithValue(r.Context(), userNumber, UserID)
+//			newReqCtx := r.WithContext(ctx)
+//			next.ServeHTTP(w, newReqCtx)
+//			return
+//		}
+//		additional := httpResp.Additional{}
+//		httpResp.Unauthorized(w, additional)
+//	})
+//}
 
 // Claims — структура утверждений, которая включает стандартные утверждения и
 // одно пользовательское UserID
@@ -126,8 +128,8 @@ type Claims struct {
 	UserID int
 }
 
-const TokenExp = time.Hour * 48
-const SecretKey = "superPuperSecretKey"
+const tokenExp = time.Hour * 48
+const secretKey = "superPuperSecretKey"
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.
 func BuildJWTString(userID int) (string, error) {
@@ -135,14 +137,14 @@ func BuildJWTString(userID int) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			// когда создан токен
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenExp)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenExp)),
 		},
 		// собственное утверждение
 		UserID: userID,
 	})
 
 	// создаём строку токена
-	tokenString, err := token.SignedString([]byte(SecretKey))
+	tokenString, err := token.SignedString([]byte(secretKey))
 	if err != nil {
 		return "", err
 	}
@@ -150,6 +152,8 @@ func BuildJWTString(userID int) (string, error) {
 	// возвращаем строку токена
 	return tokenString, nil
 }
+
+// GetUserID - получает UserID из токена.
 func GetUserID(tokenString string) int {
 	// создаём экземпляр структуры с утверждениями
 	claims := &Claims{}
@@ -158,7 +162,7 @@ func GetUserID(tokenString string) int {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 		}
-		return []byte(SecretKey), nil
+		return []byte(secretKey), nil
 	})
 
 	if err != nil {

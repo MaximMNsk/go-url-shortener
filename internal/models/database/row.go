@@ -19,6 +19,7 @@ import (
 	"time"
 )
 
+// ErrorDB - определение ошибки слоя БД.
 type ErrorDB struct {
 	layer          string
 	parentFuncName string
@@ -26,6 +27,7 @@ type ErrorDB struct {
 	message        string
 }
 
+// Error - заменяем стандартный вызов метода своим.
 func (e *ErrorDB) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
@@ -324,6 +326,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 	return JSONResp, nil
 }
 
+// JSONCutted - структура хранения входных/выходных данных для каждого УРЛ в пачке.
 type JSONCutted struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
@@ -380,6 +383,7 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
+// DeleteItem - структура хранения данных для удаления УРЛ из БД.
 type DeleteItem struct {
 	URLs   string
 	UserID int
@@ -438,6 +442,7 @@ func (jsonData *DBStorage) AsyncSaver() {
 	}
 }
 
+// ExplodeURLs - функция для парсинга json-строки.
 func ExplodeURLs(data string) ([]string, error) {
 
 	errExplodeURLs := ErrorDB{

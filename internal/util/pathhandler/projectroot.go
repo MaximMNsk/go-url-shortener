@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 )
 
+// ProjectRoot - возвращает корневую директорию проекта и ошибку.
 func ProjectRoot() (string, error) {
 	currentPath := ""
 	var err error

@@ -5,6 +5,7 @@ import (
 	"strconv"
 )
 
+// RandDigitalBytes - возвращает число заданной длины и ошибку.
 func RandDigitalBytes(count int) (int, error) {
 	minimum := 1
 	maxVal := ``

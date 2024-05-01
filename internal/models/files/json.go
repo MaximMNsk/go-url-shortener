@@ -13,6 +13,7 @@ import (
 	"sync"
 )
 
+// ErrorFile - определение ошибки слоя файлового хранилища.
 type ErrorFile struct {
 	layer          string
 	parentFuncName string
@@ -20,12 +21,15 @@ type ErrorFile struct {
 	message        string
 }
 
+// Error - заменяем стандартный вызов метода своим.
 func (e *ErrorFile) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
+// layer - слой приложения. Используется для логирования.
 const layer = `File`
 
+// FileStorage - основная структура хранения.
 type FileStorage struct {
 	Link        string `json:"original_url"`
 	ShortLink   string `json:"short_url"`
@@ -35,6 +39,7 @@ type FileStorage struct {
 	Ctx         context.Context
 }
 
+// Init - метод создает для каждого запроса объект.
 func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.ID = id
 	jsonData.Link = link
@@ -44,9 +49,11 @@ func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ct
 	jsonData.Cfg = cfg
 }
 
+// Destroy - метод утилизирует объект для работы с хранилищем.
 func (jsonData *FileStorage) Destroy() {
 }
 
+// Ping - метод для проверки работоспособности хранилища.
 func (jsonData *FileStorage) Ping() (bool, error) {
 	return true, nil
 }
@@ -58,6 +65,10 @@ type inputOutputData struct {
 	DeletedFlag bool   `json:"is_deleted"`
 }
 
+// Get - возвращает инфо о сохраненном и сокращенном УРЛ.
+// Первый возвращаемый параметр - сокращенный УРЛ,
+// второй - флаг присутствия,
+// третий - ошибка выполнения.
 func (jsonData *FileStorage) Get() (string, bool, error) {
 
 	var savedData []inputOutputData
@@ -127,6 +138,8 @@ func getData(fileName string) (string, error) {
 	return result, nil
 }
 
+// Set - сохраняет и сокращает УРЛ.
+// Возвращает статус работы в виде ошибки.
 func (jsonData *FileStorage) Set() error {
 
 	var toSave []inputOutputData
@@ -203,6 +216,7 @@ func saveData(data []byte, fileName string) error {
 	return nil
 }
 
+// MakeStorageFile - создает файл в файловой системе для хранения данных УРЛ.
 func MakeStorageFile(fileName string) error {
 
 	errMakeFile := ErrorFile{
@@ -238,6 +252,8 @@ type outputBatch struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// BatchSet - сохраняет и сокращает УРЛ пакетно.
+// Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
 func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 
 	var mx sync.Mutex
@@ -304,11 +320,14 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 	return JSONResp, nil
 }
 
+// JSONCutted - структура хранения входных/выходных данных для каждого УРЛ в пачке.
 type JSONCutted struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
 }
 
+// HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
+// Так же возвращает результат обработки запроса.
 func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 	var savedData []JSONCutted
 
@@ -342,8 +361,12 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
+// HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
+// Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
 func (jsonData *FileStorage) HandleUserUrlsDelete() {
 }
 
+// AsyncSaver - метод-демон, который работает асинхронно.
+// Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (jsonData *FileStorage) AsyncSaver() {
 }

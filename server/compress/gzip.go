@@ -20,14 +20,17 @@ func newCompressWriter(w http.ResponseWriter) *compressWriter {
 	}
 }
 
+// Header - переопределен стандартный метод через gzip.
 func (c *compressWriter) Header() http.Header {
 	return c.w.Header()
 }
 
+// Write - переопределен стандартный метод через gzip.
 func (c *compressWriter) Write(p []byte) (int, error) {
 	return c.zw.Write(p)
 }
 
+// WriteHeader - переопределен стандартный метод через gzip.
 func (c *compressWriter) WriteHeader(statusCode int) {
 	if statusCode < 300 {
 		c.w.Header().Set("Content-Encoding", "gzip")
@@ -36,6 +39,7 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 	c.zw.Reset(c.w)
 }
 
+// Close - переопределен стандартный метод через gzip.
 func (c *compressWriter) Close() error {
 	return c.zw.Close()
 }
@@ -57,10 +61,12 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	}, nil
 }
 
+// Read - переопределен стандартный метод через gzip.
 func (c *compressReader) Read(p []byte) (n int, err error) {
 	return c.zr.Read(p)
 }
 
+// Close - переопределен стандартный метод через gzip.
 func (c *compressReader) Close() error {
 	if err := c.r.Close(); err != nil {
 		return err
@@ -68,6 +74,7 @@ func (c *compressReader) Close() error {
 	return c.zr.Close()
 }
 
+// GzipHandler - функция middleware, который, в зависимости от информации в заголовках сжимает или разархивирует данные.
 func GzipHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

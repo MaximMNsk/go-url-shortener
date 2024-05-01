@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 )
 
+// Create - создает хэш-строку заданной длины из входной строки.
 func Create(input string, len int) string {
 	h := sha1.New()
 

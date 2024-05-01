@@ -10,6 +10,7 @@ import (
 	"sync"
 )
 
+// ErrorMemory - определение ошибки слоя хранилища в памяти.
 type ErrorMemory struct {
 	layer          string
 	parentFuncName string
@@ -17,12 +18,14 @@ type ErrorMemory struct {
 	message        string
 }
 
+// Error - заменяем стандартный вызов метода своим.
 func (e *ErrorMemory) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
 const layer = `Memory`
 
+// MemStorage - основная структура хранения.
 type MemStorage struct {
 	Link        string `json:"original_url"`
 	ShortLink   string `json:"short_url"`
@@ -33,6 +36,7 @@ type MemStorage struct {
 	Cfg         confModule.OuterConfig
 }
 
+// Init - метод создает для каждого запроса объект.
 func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
 	jsonData.ID = id
 	jsonData.Link = link
@@ -42,13 +46,19 @@ func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx
 	jsonData.Cfg = cfg
 }
 
+// Destroy - метод утилизирует объект для работы с хранилищем.
 func (jsonData *MemStorage) Destroy() {
 }
 
+// Ping - метод для проверки работоспособности хранилища.
 func (jsonData *MemStorage) Ping() (bool, error) {
 	return true, nil
 }
 
+// Get - возвращает инфо о сохраненном и сокращенном УРЛ.
+// Первый возвращаемый параметр - сокращенный УРЛ,
+// второй - флаг присутствия,
+// третий - ошибка выполнения.
 func (jsonData *MemStorage) Get() (string, bool, error) {
 
 	var mx sync.Mutex
@@ -77,6 +87,8 @@ func (jsonData *MemStorage) Get() (string, bool, error) {
 	return "", false, &errGet
 }
 
+// Set - сохраняет и сокращает УРЛ.
+// Возвращает статус работы в виде ошибки.
 func (jsonData *MemStorage) Set() error {
 
 	var mx sync.Mutex
@@ -109,6 +121,8 @@ type outputBatch struct {
 	ShortURL      string `json:"short_url"`
 }
 
+// BatchSet - сохраняет и сокращает УРЛ пакетно.
+// Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
 func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 
 	var mx sync.Mutex
@@ -152,11 +166,14 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 	return JSONResp, nil
 }
 
+// JSONCutted - структура хранения входных/выходных данных для каждого УРЛ в пачке.
 type JSONCutted struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
 }
 
+// HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
+// Так же возвращает результат обработки запроса.
 func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 
 	errHandleUserUrls := ErrorMemory{
@@ -184,7 +201,12 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 	return nil, nil
 }
 
+// HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
+// Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
 func (jsonData *MemStorage) HandleUserUrlsDelete() {
 }
+
+// AsyncSaver - метод-демон, который работает асинхронно.
+// Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (jsonData *MemStorage) AsyncSaver() {
 }

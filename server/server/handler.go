@@ -32,6 +32,7 @@ type ErrorHandlers struct {
 	message        string
 }
 
+// Error - заменяет стандартный вызов метода своим.
 func (e *ErrorHandlers) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
