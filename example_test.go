@@ -25,6 +25,7 @@ func Example() {
 	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
 	response, _ := http.DefaultClient.Do(request)
 	fmt.Println(response.StatusCode)
+	_ = response.Body.Close()
 
 	// Инициализируем и выполняем post запрос.
 	body := strings.NewReader(`ya.ru`)
@@ -41,13 +42,14 @@ func Example() {
 	response, _ = client.Do(request)
 	fmt.Println(response.StatusCode)
 	fmt.Println(response.Header.Get(`Location`))
+	_ = response.Body.Close()
+
+	// Останавливаем сервер.
+	_ = serv.Stop()
 
 	// Output:
 	// 200
 	// 201
 	// 307
 	// ya.ru
-
-	// Останавливаем сервер.
-	_ = serv.Stop()
 }
