@@ -1,3 +1,4 @@
+// Package database - прикладной пакет для работы с БД.
 package database
 
 import (

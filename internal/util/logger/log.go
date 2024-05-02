@@ -1,3 +1,4 @@
+// Package logger - формирование форматированных сообщений для логирования.
 package logger
 
 import (

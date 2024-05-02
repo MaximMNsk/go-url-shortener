@@ -1,3 +1,4 @@
+// Package randomizer - генератор случайных чисел заданной длины.
 package randomizer
 
 import (

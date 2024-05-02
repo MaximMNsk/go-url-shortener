@@ -1,3 +1,4 @@
+// Package http - слой отправки ответов сервера.
 package http
 
 import (
@@ -96,4 +97,9 @@ func Accepted(w http.ResponseWriter, addData Additional) {
 // Gone - отдает по http статус 410.
 func Gone(w http.ResponseWriter, addData Additional) {
 	successAnswerJSON(w, http.StatusGone, addData)
+}
+
+// Shutdown - заглушка на время остановки сервера. Отдает 503 ответ.
+func Shutdown(w http.ResponseWriter) {
+	http.Error(w, "503 service unavailable", http.StatusServiceUnavailable)
 }

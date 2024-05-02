@@ -12,9 +12,12 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/models/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	memoryStorage "github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/extlogger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
+	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
 	"github.com/go-chi/chi/v5"
@@ -22,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"net/http"
+	"net/http/pprof"
 )
 
 // ErrorHandlers - тип для работы с ошибками слоя обработчиков.
@@ -39,6 +43,11 @@ func (e *ErrorHandlers) Error() string {
 
 // HandleGET - метод получения URL из ShortURL.
 func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
+
+	if s.ShutdownProcess {
+		httpResp.Shutdown(res)
+		return
+	}
 
 	// Пришел ид.
 	requestID := req.URL.Path[1:]
@@ -78,6 +87,11 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 
 // HandlePOST - принимает запрос, наполняет объект данными, выполняет запрос к хранилищу.
 func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
+
+	if s.ShutdownProcess {
+		httpResp.Shutdown(res)
+		return
+	}
 
 	contentBody, errBody := io.ReadAll(req.Body)
 	defer func(Body io.ReadCloser) {
@@ -126,6 +140,11 @@ type controllers map[string]bool
 // HandleAPI - принимает и маршрутизирует API запросы.
 // В зависимости от контроллера запроса и метода вызывает соответствующую функцию обработки.
 func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
+
+	if s.ShutdownProcess {
+		httpResp.Shutdown(res)
+		return
+	}
 
 	ctrl := chi.URLParam(req, "query")
 
@@ -292,6 +311,11 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 
 // HandlePing - метод сервера для проверки доступности хранилища.
 func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
+	if s.ShutdownProcess {
+		httpResp.Shutdown(res)
+		return
+	}
+
 	handlePingErr := &ErrorHandlers{
 		layer:          `Handlers`,
 		funcName:       `ChooseStorage`,
@@ -371,14 +395,81 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 
 // Server - основная структура сервера, определяющая его работу.
 type Server struct {
-	Storage model.Storable
-	Routers chi.Router
-	Config  confModule.OuterConfig
-	Context context.Context
+	Storage         model.Storable
+	Routers         chi.Router
+	Config          confModule.OuterConfig
+	Context         context.Context
+	HTTP            http.Server
+	ShutdownProcess bool
 }
 
-// NewServ - создает новый сервер.
+// NewServ - создает новый сервер для тестов.
 // Параметрами передаются конфигурация, модель сохранения, контекст для сервера.
 func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
-	return Server{Storage: s, Config: c, Context: ctx}
+	return Server{Storage: s, Config: c, Context: ctx, ShutdownProcess: false}
+}
+
+// Start - запускает сервер в работу.
+func (s *Server) Start() error {
+	if s.ShutdownProcess {
+		return nil
+	}
+
+	ctx := context.Background()
+
+	storage, err := ChooseStorage(ctx, s.Config)
+	if err != nil {
+		var serverHandlersErr *ErrorHandlers
+		if errors.As(err, &serverHandlersErr) {
+			return fmt.Errorf(`can't handle storage: %w`, err)
+		}
+		return fmt.Errorf(`can't create storage environment: %w`, err)
+	}
+
+	s.Storage = storage
+
+	s.Routers = chi.NewRouter().
+		With(extlogger.Log).
+		With(compress.GzipHandler).
+		With(HandleOther)
+	s.Routers.Route("/", func(r chi.Router) {
+		s.Routers.Group(func(r chi.Router) {
+			r.HandleFunc("/debug/pprof/*", pprof.Index)
+			r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			r.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		})
+		s.Routers.Group(func(r chi.Router) {
+			r.Use(cookie.AuthSetter)
+			r.Post(`/`, s.HandlePOST)
+			r.Post(`/api/{query}`, s.HandleAPI)
+			r.Post(`/api/shorten/{query}`, s.HandleAPI)
+			r.Get(`/ping`, s.HandlePing)
+			r.Get(`/{query}`, s.HandleGET)
+		})
+		s.Routers.Group(func(r chi.Router) {
+			r.Use(cookie.AuthChecker)
+			r.Delete(`/api/user/{query}`, s.HandleAPI)
+			r.Get(`/api/user/{query}`, s.HandleAPI)
+		})
+	})
+
+	s.HTTP.Addr = s.Config.Final.AppAddr
+	s.HTTP.Handler = s.Routers
+	err = s.HTTP.ListenAndServe()
+	if err != nil {
+		return fmt.Errorf(`can't start http listener: %w`, err)
+	}
+
+	return nil
+}
+
+// Stop - останавливает сервер.
+func (s *Server) Stop() error {
+	s.ShutdownProcess = true
+	s.Storage.Destroy()
+	err := s.HTTP.Shutdown(s.Context)
+	if err != nil {
+		return err
+	}
+	return nil
 }

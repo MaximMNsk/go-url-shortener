@@ -1,3 +1,4 @@
+// Package shorter - сборщик полного УРЛ.
 package shorter
 
 import "fmt"
