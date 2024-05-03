@@ -17,7 +17,7 @@ func main() {
 		logger.PrintLog(logger.INFO, "Config error", true)
 	}
 
-	var serv server.Server
+	var serv *server.Server
 	serv.Config = conf
 	serv.LogEnabled = true
 

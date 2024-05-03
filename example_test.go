@@ -20,9 +20,9 @@ func Example() {
 	}
 
 	// Запускаем сервер.
-	var serv server.Server
+	var serv *server.Server
 	serv.Config = conf
-	go func(server.Server) {
+	go func(*server.Server) {
 		_ = serv.Start()
 	}(serv)
 
