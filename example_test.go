@@ -21,7 +21,6 @@ func Example() {
 
 	// Запускаем сервер.
 	var serv server.Server
-	//serv.Config = conf
 	go func() {
 		serv.Init(conf, false)
 		_ = serv.Start()
