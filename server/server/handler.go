@@ -412,6 +412,7 @@ func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Se
 	return Server{Storage: s, Config: c, Context: ctx, ShutdownProcess: false}
 }
 
+// Init - инициализирует сервер параметрами.
 func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) {
 	s.Config = cfg
 	s.LogEnabled = needLogging
