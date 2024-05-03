@@ -428,13 +428,13 @@ func (jsonData *DBStorage) AsyncSaver() {
 		case data, ok := <-toDeleteCh:
 			if !ok {
 				errHandleUserUrlsDelete.message = `channel reading error`
-				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error())
+				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error(), true)
 				continue
 			}
 			err := batchUpdate(data.URLs, jsonData.ConnectionPool)
 			if err != nil {
 				errHandleUserUrlsDelete.message = `update error`
-				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error())
+				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error(), true)
 				continue
 			}
 		default:

@@ -14,40 +14,75 @@ func Example() {
 
 	// Инициализируем конфиг.
 	var conf config.OuterConfig
-	_ = conf.InitConfig(true)
+	err := conf.InitConfig(true)
+	if err != nil {
+		fmt.Println(`Config error: `, err.Error())
+	}
 
 	// Запускаем сервер.
 	var serv server.Server
 	serv.Config = conf
-	_ = serv.Start()
+	go func(server.Server) {
+		_ = serv.Start()
+	}(serv)
 
 	// Инициализируем и выполняем ping запрос.
-	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
-	response, _ := http.DefaultClient.Do(request)
+	request, err := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
 	fmt.Println(response.StatusCode)
-	_ = response.Body.Close()
+	err = response.Body.Close()
+	if err != nil {
+		fmt.Println(`Close body error: `, err.Error())
+	}
 
 	// Инициализируем и выполняем post запрос.
 	body := strings.NewReader(`ya.ru`)
-	request, _ = http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
-	response, _ = http.DefaultClient.Do(request)
+	request, err = http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
+	response, err = http.DefaultClient.Do(request)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
 	fmt.Println(response.StatusCode)
-	_ = response.Body.Close()
+	err = response.Body.Close()
+	if err != nil {
+		fmt.Println(`Close body error: `, err.Error())
+	}
 
 	// Инициализируем и выполняем get запрос.
 	shortLinkID := sha1hash.Create(`ya.ru`, 8)
-	request, _ = http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	request, err = http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
 	client := http.DefaultClient
 	client.CheckRedirect = requests.NoFollow
-	response, _ = client.Do(request)
+	response, err = client.Do(request)
+	if err != nil {
+		fmt.Println(`Request error: `, err.Error())
+	}
 	fmt.Println(response.StatusCode)
 	fmt.Println(response.Header.Get(`Location`))
-	_ = response.Body.Close()
+	err = response.Body.Close()
+	if err != nil {
+		fmt.Println(`Close body error: `, err.Error())
+	}
 
 	// Останавливаем сервер.
-	_ = serv.Stop()
+	err = serv.Stop()
+	if err != nil {
+		fmt.Println(`Server error: `, err.Error())
+	}
 
-	// Output:
+	// Unordered output:
 	// 200
 	// 201
 	// 307

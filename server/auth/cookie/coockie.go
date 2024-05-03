@@ -26,18 +26,15 @@ func AuthSetter(next http.Handler) http.Handler {
 
 		UserID, errUserID := randomizer.RandDigitalBytes(3)
 		if errUserID != nil {
-			logger.PrintLog(logger.WARN, err.Error())
+			logger.PrintLog(logger.WARN, err.Error(), true)
 		}
 
 		if err != nil {
 			if errors.Is(err, http.ErrNoCookie) {
-				logInfo := fmt.Sprintf("Set userID: %d", UserID)
-				logger.PrintLog(logger.INFO, logInfo)
 				newToken, err := BuildJWTString(UserID)
 				if err != nil {
-					logger.PrintLog(logger.WARN, err.Error())
+					logger.PrintLog(logger.WARN, err.Error(), true)
 				}
-				logger.PrintLog(logger.DEBUG, `Set token: `+newToken)
 				cookie := &http.Cookie{
 					Name:    `token`,
 					Value:   newToken,
@@ -64,9 +61,7 @@ func AuthChecker(next http.Handler) http.Handler {
 			httpResp.Unauthorized(w, additional)
 			return
 		}
-		logger.PrintLog(logger.DEBUG, `Present token: `+token.Value)
 		UserID := GetUserID(token.Value)
-		logger.PrintLog(logger.DEBUG, `Present userID: `+strconv.Itoa(UserID))
 		if UserID > 0 {
 			userNumber := UserNum(`UserID`)
 			ctx := context.WithValue(r.Context(), userNumber, UserID)
@@ -173,11 +168,9 @@ func GetUserID(tokenString string) int {
 	}
 
 	if !token.Valid {
-		logger.PrintLog(logger.WARN, `Invalid token`)
+		logger.PrintLog(logger.WARN, `Invalid token`, true)
 		return -1
 	}
-
-	logger.PrintLog(logger.INFO, `Token is valid!`)
 
 	// возвращаем ID пользователя в читаемом виде
 	return claims.UserID

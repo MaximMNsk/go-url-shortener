@@ -105,7 +105,7 @@ func GzipHandler(next http.Handler) http.Handler {
 			defer func(cw *compressWriter) {
 				err := cw.Close()
 				if err != nil {
-					logger.PrintLog(logger.ERROR, "Can't close compress writer: "+err.Error())
+					logger.PrintLog(logger.ERROR, "Can't close compress writer: "+err.Error(), true)
 				}
 			}(cw)
 		}
@@ -125,7 +125,7 @@ func GzipHandler(next http.Handler) http.Handler {
 			defer func(cr *compressReader) {
 				err := cr.Close()
 				if err != nil {
-					logger.PrintLog(logger.ERROR, "Can't close compress reader")
+					logger.PrintLog(logger.ERROR, "Can't close compress reader", true)
 				}
 			}(cr)
 		}

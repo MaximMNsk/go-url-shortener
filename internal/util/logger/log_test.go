@@ -49,7 +49,7 @@ func TestPrintLog(t *testing.T) {
 			rescueStdout := os.Stdout
 			os.Stdout = w
 
-			PrintLog(tt.args.level, tt.args.message)
+			PrintLog(tt.args.level, tt.args.message, true)
 
 			err = w.Close()
 			require.NoError(t, err)

@@ -56,14 +56,14 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	saved, deleted, err := s.Storage.Get()
 	// 400.
 	if err != nil {
-		logger.PrintLog(logger.WARN, "Get exception: "+err.Error())
+		logger.PrintLog(logger.WARN, "Get exception: "+err.Error(), s.LogEnabled)
 		httpResp.BadRequest(res)
 		return
 	}
 
 	// 410.
 	if deleted {
-		logger.PrintLog(logger.INFO, "Current item was deleted")
+		logger.PrintLog(logger.INFO, "Current item was deleted", s.LogEnabled)
 		httpResp.Gone(res, httpResp.Additional{})
 		return
 	}
@@ -75,13 +75,13 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 			InnerData: saved,
 		}
 		// Если есть, отдаем 307 редирект.
-		//logger.PrintLog(logger.INFO, "Success")
+		logger.PrintLog(logger.INFO, "Success", s.LogEnabled)
 		httpResp.TempRedirect(res, additional)
 		return
 	}
 
 	// Если нет, отдаем BadRequest 400.
-	logger.PrintLog(logger.WARN, "Not success")
+	logger.PrintLog(logger.WARN, "Not success", s.LogEnabled)
 	httpResp.BadRequest(res)
 }
 
@@ -122,12 +122,12 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		var pgErrType *pgconn.PgError
 		if errors.As(setErr, &pgErrType) {
 			if pgErrType.Code == pgerrcode.UniqueViolation {
-				logger.PrintLog(logger.WARN, "Can not set link data: "+setErr.Error())
+				logger.PrintLog(logger.WARN, "Can not set link data: "+setErr.Error(), s.LogEnabled)
 				httpResp.Conflict(res, additional)
 				return
 			}
 		}
-		logger.PrintLog(logger.ERROR, "Can not set link data: "+setErr.Error())
+		logger.PrintLog(logger.ERROR, "Can not set link data: "+setErr.Error(), s.LogEnabled)
 		httpResp.BadRequest(res)
 		return
 	}
@@ -296,11 +296,11 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == `23505` {
-				logger.PrintLog(logger.WARN, "Can not set link data: "+err.Error())
+				logger.PrintLog(logger.WARN, "Can not set link data: "+err.Error(), s.LogEnabled)
 				httpResp.ConflictJSON(res, additional)
 				return
 			}
-			logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error())
+			logger.PrintLog(logger.ERROR, "Can not set link data: "+err.Error(), s.LogEnabled)
 			httpResp.BadRequest(res)
 			return
 		}
@@ -328,7 +328,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		httpResp.Ok(res)
 		return
 	}
-	logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error())
+	logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error(), s.LogEnabled)
 	httpResp.InternalError(res)
 }
 
@@ -400,6 +400,7 @@ type Server struct {
 	Config          confModule.OuterConfig
 	Context         context.Context
 	HTTP            http.Server
+	LogEnabled      bool
 	ShutdownProcess bool
 }
 
@@ -429,9 +430,11 @@ func (s *Server) Start() error {
 	s.Storage = storage
 
 	s.Routers = chi.NewRouter().
-		With(extlogger.Log).
 		With(compress.GzipHandler).
 		With(HandleOther)
+	if s.LogEnabled {
+		s.Routers.With(extlogger.Log)
+	}
 	s.Routers.Route("/", func(r chi.Router) {
 		s.Routers.Group(func(r chi.Router) {
 			r.HandleFunc("/debug/pprof/*", pprof.Index)
