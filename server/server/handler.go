@@ -328,8 +328,10 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		httpResp.Ok(res)
 		return
 	}
-	logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error(), s.LogEnabled)
-	httpResp.InternalError(res)
+	if err != nil {
+		logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error(), s.LogEnabled)
+		httpResp.InternalError(res)
+	}
 }
 
 // HandleOther - middleware для обработки неожидаемых запросов.
@@ -410,15 +412,20 @@ func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Se
 	return Server{Storage: s, Config: c, Context: ctx, ShutdownProcess: false}
 }
 
+func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) {
+	s.Config = cfg
+	s.LogEnabled = needLogging
+	s.ShutdownProcess = false
+	s.Context = context.Background()
+}
+
 // Start - запускает сервер в работу.
 func (s *Server) Start() error {
 	if s.ShutdownProcess {
 		return nil
 	}
 
-	ctx := context.Background()
-
-	storage, err := ChooseStorage(ctx, s.Config)
+	storage, err := ChooseStorage(s.Context, s.Config)
 	if err != nil {
 		var serverHandlersErr *ErrorHandlers
 		if errors.As(err, &serverHandlersErr) {

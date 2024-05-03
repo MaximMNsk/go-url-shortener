@@ -17,9 +17,8 @@ func main() {
 		logger.PrintLog(logger.INFO, "Config error", true)
 	}
 
-	var serv *server.Server
-	serv.Config = conf
-	serv.LogEnabled = true
+	var serv server.Server
+	serv.Init(conf, true)
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGABRT, syscall.SIGINT, syscall.SIGSEGV)

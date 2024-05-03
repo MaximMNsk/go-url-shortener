@@ -20,11 +20,12 @@ func Example() {
 	}
 
 	// Запускаем сервер.
-	var serv *server.Server
-	serv.Config = conf
-	go func(*server.Server) {
+	var serv server.Server
+	//serv.Config = conf
+	go func() {
+		serv.Init(conf, false)
 		_ = serv.Start()
-	}(serv)
+	}()
 
 	// Инициализируем и выполняем ping запрос.
 	request, err := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
