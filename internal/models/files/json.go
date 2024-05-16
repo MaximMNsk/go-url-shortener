@@ -40,13 +40,14 @@ type FileStorage struct {
 }
 
 // Init - метод создает для каждого запроса объект.
-func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
+func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) error {
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.Ctx = ctx
 	jsonData.DeletedFlag = isDeleted
 	jsonData.Cfg = cfg
+	return nil
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.

@@ -11,7 +11,7 @@ import (
 type Storable interface {
 
 	// Init - метод Инициализации хранилища.
-	Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg config.OuterConfig)
+	Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg config.OuterConfig) error
 
 	// Get - получение данных из хранилища, где:
 	// первое значение - данные,

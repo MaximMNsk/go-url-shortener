@@ -59,7 +59,6 @@ func TestDBStorage_Init(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
 				assert.NotEmpty(t, Conf.Final.DB)
-				return
 			}
 			userNumber := cookie.UserNum(`UserID`)
 			UserID, err := randomizer.RandDigitalBytes(3)
@@ -67,7 +66,8 @@ func TestDBStorage_Init(t *testing.T) {
 			ctx := context.WithValue(tt.args.ctx, userNumber, strconv.Itoa(UserID))
 			require.NoError(t, ConfErr)
 			require.NoError(t, PgErr)
-			Store.Init(tt.args.link, tt.args.shortLink, tt.args.id, tt.args.isDeleted, ctx, Conf)
+			err = Store.Init(tt.args.link, tt.args.shortLink, tt.args.id, tt.args.isDeleted, ctx, Conf)
+			require.NoError(t, err)
 			assert.Equal(t, tt.want.DBStorage.Link, Store.Link)
 			assert.Equal(t, tt.want.DBStorage.ShortLink, Store.ShortLink)
 			assert.Equal(t, tt.want.DBStorage.DeletedFlag, Store.DeletedFlag)
@@ -101,7 +101,6 @@ func TestDBStorage_Ping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
 				assert.NotEmpty(t, Conf.Final.DB)
-				return
 			}
 
 			res, err := tt.args.storage.Ping()
@@ -111,34 +110,33 @@ func TestDBStorage_Ping(t *testing.T) {
 	}
 }
 
-func TestPrepareDB(t *testing.T) {
-	type args struct{}
-	type want struct{}
-
-	tests := []struct {
-		name string
-		args args
-		want want
-	}{
-		{
-			name: `Test prepare DB`,
-			args: args{},
-			want: want{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
-				assert.NotEmpty(t, Conf.Final.DB)
-				return
-			}
-
-			err := PrepareDB(Conf.Final.DB)
-			require.NoError(t, err)
-		})
-	}
-}
+//func TestPrepareDB(t *testing.T) {
+//	type args struct{}
+//	type want struct{}
+//
+//	tests := []struct {
+//		name string
+//		args args
+//		want want
+//	}{
+//		{
+//			name: `Test prepare DB`,
+//			args: args{},
+//			want: want{},
+//		},
+//	}
+//
+//	for _, tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
+//				assert.NotEmpty(t, Conf.Final.DB)
+//			}
+//
+//			err := PrepareDB(Conf.Final.DB)
+//			require.NoError(t, err)
+//		})
+//	}
+//}
 
 func TestExplodeURLs(t *testing.T) {
 	type args struct {
@@ -212,7 +210,6 @@ func TestDBStorage_Set(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
 				assert.NotEmpty(t, Conf.Final.DB)
-				return
 			}
 
 			Store.Link = tt.args.link
@@ -256,7 +253,6 @@ func TestDBStorage_Get(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
 				assert.NotEmpty(t, Conf.Final.DB)
-				return
 			}
 
 			Store.Link = tt.args.link

@@ -61,13 +61,15 @@ type DBStorage struct {
 }
 
 // Init - метод создает для каждого запроса объект.
-func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) {
+func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) error {
 	jsonData.Ctx = ctx
 	jsonData.ID = id
 	jsonData.Link = link
 	jsonData.ShortLink = shortLink
 	jsonData.DeletedFlag = isDeleted
 	jsonData.Cfg = cfg
+	err := prepare(cfg.Final.DB)
+	return err
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
@@ -97,8 +99,7 @@ update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 const updateRowNoUser = `
 update public.short_links set is_deleted = true where uid = $1`
 
-// PrepareDB - подготавливает хранилище, выполняет миграции.
-func PrepareDB(dsn string) error {
+func prepare(dsn string) error {
 
 	prepareErr := ErrorDB{
 		layer:          layer,
@@ -125,7 +126,7 @@ func PrepareDB(dsn string) error {
 	return nil
 }
 
-// Ping - метод для проверки работоспособности хранилища.
+// Ping - прикладной метод для проверки работоспособности хранилища.
 func (jsonData *DBStorage) Ping() (bool, error) {
 
 	err := jsonData.ConnectionPool.Ping(jsonData.Ctx)
@@ -191,7 +192,7 @@ func getData(data DBStorage) (DBStorage, error) {
 	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
 	if err != nil {
 		getDataErr.message = fmt.Sprintf(`Error: %v, ID: %s, Link: %s, UserID: %s`,
-			err.Error(), data.ID, data.Link, userID)
+			err, data.ID, data.Link, userID)
 		return selected, &getDataErr
 	}
 
@@ -217,6 +218,11 @@ func (jsonData *DBStorage) Set() error {
 	return nil
 }
 
+//go:generate go run github.com/vektra/mockery/v2@v2.43.0 --name=DataSaver
+type DataSaver interface {
+	saveData(data DBStorage) error
+}
+
 func saveData(data DBStorage) error {
 
 	errSave := ErrorDB{
@@ -225,14 +231,13 @@ func saveData(data DBStorage) error {
 		parentFuncName: `Set`,
 	}
 
-	ctx := data.Ctx
 	connection := data.ConnectionPool
 	if connection == nil {
 		errSave.message = `connection to DB not found`
 		return &errSave
 	}
 
-	acquire, err := connection.Acquire(ctx)
+	acquire, err := connection.Acquire(data.Ctx)
 	if err != nil {
 		errSave.message = `cant acquire connection`
 		return fmt.Errorf(errSave.Error()+`: %w`, err)
@@ -240,12 +245,12 @@ func saveData(data DBStorage) error {
 	defer acquire.Release()
 
 	userID := `0`
-	reqUserID := ctx.Value(cookie.UserNum(`UserID`))
+	reqUserID := data.Ctx.Value(cookie.UserNum(`UserID`))
 	if reqUserID != nil {
 		userID = reqUserID.(string)
 	}
 
-	_, err = acquire.Exec(ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
+	_, err = acquire.Exec(data.Ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
 
 	if err != nil {
 		errSave.message = `cannot insert row`

@@ -8,6 +8,7 @@ import (
 	"github.com/carlmjohnson/requests"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func Example() {
@@ -15,19 +16,27 @@ func Example() {
 	// Инициализируем конфиг.
 	var conf config.OuterConfig
 	err := conf.InitConfig(true)
+	conf.Final.AppAddr = `localhost:8181`
+	conf.Final.ShortURLAddr = `http://localhost:8181`
 	if err != nil {
 		fmt.Println(`Config error: `, err.Error())
 	}
 
 	// Запускаем сервер.
 	var serv server.Server
+	serv.Init(conf, false)
 	go func() {
-		serv.Init(conf, false)
-		_ = serv.Start()
+		err = serv.Start()
+		if err != nil {
+			fmt.Println(`Starting error: `, err.Error())
+		}
 	}()
 
+	// Подождем пока сервер запустится в отдельной горутине
+	time.Sleep(100 * time.Millisecond)
+
 	// Инициализируем и выполняем ping запрос.
-	request, err := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
+	request, err := http.NewRequest(http.MethodGet, `http://localhost:8181/ping`, nil)
 	if err != nil {
 		fmt.Println(`Request error: `, err.Error())
 	}
@@ -43,7 +52,7 @@ func Example() {
 
 	// Инициализируем и выполняем post запрос.
 	body := strings.NewReader(`ya.ru`)
-	request, err = http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
+	request, err = http.NewRequest(http.MethodPost, `http://localhost:8181/`, body)
 	if err != nil {
 		fmt.Println(`Request error: `, err.Error())
 	}
@@ -59,7 +68,7 @@ func Example() {
 
 	// Инициализируем и выполняем get запрос.
 	shortLinkID := sha1hash.Create(`ya.ru`, 8)
-	request, err = http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	request, err = http.NewRequest(http.MethodGet, `http://localhost:8181/`+shortLinkID, nil)
 	if err != nil {
 		fmt.Println(`Request error: `, err.Error())
 	}

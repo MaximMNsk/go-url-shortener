@@ -365,10 +365,7 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 		}
 		storage = &database.DBStorage{
 			ConnectionPool: pgPool,
-		}
-		err = database.PrepareDB(conf.Final.DB)
-		if err != nil {
-			return storage, fmt.Errorf(pgPoolErr.Error()+`%w`, err)
+			Cfg:            conf,
 		}
 
 		go storage.AsyncSaver()
@@ -468,6 +465,9 @@ func (s *Server) Start() error {
 	s.HTTP.Handler = s.Routers
 	err = s.HTTP.ListenAndServe()
 	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) && s.ShutdownProcess {
+			return nil
+		}
 		return fmt.Errorf(`can't start http listener: %w`, err)
 	}
 
