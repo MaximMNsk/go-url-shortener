@@ -21,6 +21,50 @@ var Serv Server
 var Cfg config.OuterConfig
 var Storage model.Storable
 
+func TestErrorDB_Error(t *testing.T) {
+	type args struct {
+		layer          string
+		parentFuncName string
+		funcName       string
+		message        string
+	}
+	type want struct {
+		message string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Error`,
+			args: args{
+				layer:          `db`,
+				parentFuncName: `some`,
+				funcName:       `this`,
+				message:        `word`,
+			},
+			want: want{
+				message: `[db](some/this): word`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ErrorHandlers{
+				layer:          tt.args.layer,
+				funcName:       tt.args.funcName,
+				message:        tt.args.message,
+				parentFuncName: tt.args.parentFuncName,
+			}
+			msg := err.Error()
+			assert.Equal(t, tt.want.message, msg)
+		})
+	}
+}
+
 func TestChooseStorage(t *testing.T) {
 	type args struct{}
 	type want struct{}

@@ -104,7 +104,7 @@ func prepare(dsn string) error {
 	prepareErr := ErrorDB{
 		layer:          layer,
 		parentFuncName: `-`,
-		funcName:       `PrepareDB`,
+		funcName:       `prepare`,
 	}
 
 	m, err := migrate.New(
@@ -156,7 +156,7 @@ func (jsonData *DBStorage) Get() (string, bool, error) {
 
 	row, err := getData(*jsonData)
 	if err != nil {
-		return row.Link, row.DeletedFlag, fmt.Errorf(getErr.Error()+`%w`, err)
+		return ``, false, fmt.Errorf(getErr.Error()+`%w`, err)
 	}
 	return row.Link, row.DeletedFlag, nil
 }
