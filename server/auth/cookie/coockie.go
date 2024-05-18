@@ -29,7 +29,6 @@ func AuthSetter(next http.Handler) http.Handler {
 		}
 
 		if err != nil {
-			logger.PrintLog(logger.WARN, err.Error(), true)
 			if errors.Is(err, http.ErrNoCookie) {
 				newToken, err := BuildJWTString(UserID)
 				if err != nil {
@@ -66,15 +65,15 @@ func AuthChecker(next http.Handler) http.Handler {
 			return
 		}
 		UserID := GetUserID(token.Value)
-		if UserID > 0 {
-			userNumber := UserNum(`UserID`)
-			ctx := context.WithValue(r.Context(), userNumber, UserID)
-			newReqCtx := r.WithContext(ctx)
-			next.ServeHTTP(w, newReqCtx)
+		if UserID < 0 {
+			additional := httpResp.Additional{}
+			httpResp.Unauthorized(w, additional)
 			return
 		}
-		additional := httpResp.Additional{}
-		httpResp.Unauthorized(w, additional)
+		userNumber := UserNum(`UserID`)
+		ctx := context.WithValue(r.Context(), userNumber, UserID)
+		newReqCtx := r.WithContext(ctx)
+		next.ServeHTTP(w, newReqCtx)
 		return
 	})
 }
