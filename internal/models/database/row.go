@@ -172,7 +172,11 @@ func getData(data DBStorage) (DBStorage, error) {
 		funcName:       `getData`,
 	}
 
-	userID := data.Ctx.Value(cookie.UserNum(`UserID`))
+	userID := `0`
+	reqUserID := data.Ctx.Value(cookie.UserNum(`UserID`))
+	if reqUserID != nil {
+		userID = strconv.Itoa(reqUserID.(int))
+	}
 
 	acquire, err := connection.Acquire(data.Ctx)
 	if err != nil {
@@ -247,7 +251,7 @@ func saveData(data DBStorage) error {
 	userID := `0`
 	reqUserID := data.Ctx.Value(cookie.UserNum(`UserID`))
 	if reqUserID != nil {
-		userID = reqUserID.(string)
+		userID = strconv.Itoa(reqUserID.(int))
 	}
 
 	_, err = acquire.Exec(data.Ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
@@ -295,7 +299,11 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
-	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+	userID := `0`
+	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+	if reqUserID != nil {
+		userID = strconv.Itoa(reqUserID.(int))
+	}
 
 	if jsonData.ConnectionPool == nil {
 		errBatchSet.message = "connection to DB not found"
@@ -311,7 +319,7 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	var batch pgx.Batch
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID.(string))
+		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID)
 	}
 	br := acquire.SendBatch(jsonData.Ctx, &batch)
 	defer br.Close()
@@ -361,9 +369,13 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 	}
 	defer acquire.Release()
 
-	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+	userID := `0`
+	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+	if reqUserID != nil {
+		userID = strconv.Itoa(reqUserID.(int))
+	}
 
-	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, strconv.Itoa(userID.(int)))
+	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, userID)
 	if err != nil {
 		errHandleUserUrls.message = "select error"
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
@@ -400,7 +412,11 @@ var toDeleteCh chan DeleteItem
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
 func (jsonData *DBStorage) HandleUserUrlsDelete() {
-	userID := jsonData.Ctx.Value(cookie.UserNum(`UserID`)).(int)
+	userID := 0
+	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
+	if reqUserID != nil {
+		userID = reqUserID.(int)
+	}
 
 	inputData := DeleteItem{
 		URLs:   jsonData.Link,

@@ -42,7 +42,11 @@ func (e *ErrorHandlers) Error() string {
 }
 
 // HandleGET - метод получения URL из ShortURL.
+// Эндпоинт с методом GET и путём /{id}, где id — идентификатор сокращённого URL (например, /EwHXdJfB).
+// В случае успешной обработки запроса сервер возвращает ответ с кодом 307 и оригинальным URL в HTTP-заголовке Location.
 func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
+
+	logger.PrintLog(logger.DEBUG, `HandleGET`, s.LogEnabled)
 
 	if s.ShutdownProcess {
 		httpResp.Shutdown(res)
@@ -52,7 +56,12 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	// Пришел ид.
 	requestID := req.URL.Path[1:]
 
-	s.Storage.Init(``, ``, requestID, false, req.Context(), s.Config)
+	err := s.Storage.Init(``, ``, requestID, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	saved, deleted, err := s.Storage.Get()
 	// 400.
 	if err != nil {
@@ -86,7 +95,12 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 }
 
 // HandlePOST - принимает запрос, наполняет объект данными, выполняет запрос к хранилищу.
+// Эндпоинт с методом POST и путём /.
+// Сервер принимает в теле запроса строку URL как text/plain
+// и возвращает ответ с кодом 201 и сокращённым URL как text/plain.
 func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
+
+	logger.PrintLog(logger.DEBUG, `HandlePOST`, s.LogEnabled)
 
 	if s.ShutdownProcess {
 		httpResp.Shutdown(res)
@@ -115,14 +129,20 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		InnerData: shortLink,
 	}
 
-	s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context(), s.Config)
+	err := s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	setErr := s.Storage.Set()
 
 	if setErr != nil {
 		var pgErrType *pgconn.PgError
 		if errors.As(setErr, &pgErrType) {
 			if pgErrType.Code == pgerrcode.UniqueViolation {
-				logger.PrintLog(logger.WARN, "Can not set link data: "+setErr.Error(), s.LogEnabled)
+				txt := fmt.Sprintf(`Can not set link data: %s, body: %s`, setErr.Error(), string(contentBody))
+				logger.PrintLog(logger.WARN, txt, s.LogEnabled)
 				httpResp.Conflict(res, additional)
 				return
 			}
@@ -180,7 +200,16 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 
 // HandleAPIUserUrlsDelete - функция метода HandleAPI, агрегирующая логику удаления пакета URL через API.
 // Работает для конкретного пользователя.
+// хендлер DELETE /api/user/urls в теле запроса принимает список идентификаторов сокращённых URL
+// для асинхронного удаления. Запрос может быть таким:
+// DELETE http://localhost:8080/api/user/urls
+// Content-Type: application/json
+//
+// ["6qxTVvsy", "RTfd56hn", "Jlfd67ds"]
 func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Server) {
+
+	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrlsDelete`, s.LogEnabled)
+
 	contentBody, errBody := io.ReadAll(req.Body)
 	defer req.Body.Close()
 	if errBody != nil {
@@ -189,15 +218,37 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	}
 	httpResp.Accepted(res, httpResp.Additional{})
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
+	err := s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	s.Storage.HandleUserUrlsDelete()
 }
 
 // HandleAPIUserUrls - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
 // Работает для конкретного пользователя.
+// хендлер GET /api/user/urls может вернуть пользователю все когда-либо сокращённые им URL в формате:
+// [
+//
+//	{
+//	    "short_url": "http://...",
+//	    "original_url": "http://..."
+//	},
+//	...
+//
+// ]
 func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
-	s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
+	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrls`, s.LogEnabled)
+
+	err := s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	byteRes, err := s.Storage.HandleUserUrls()
 
 	if err != nil {
@@ -218,7 +269,29 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 }
 
 // HandleAPIBatch - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
+// хендлер POST /api/shorten/batch, принимает в теле запроса множество URL для сокращения в формате:
+// [
+//
+//	{
+//	    "correlation_id": "<строковый идентификатор>",
+//	    "original_url": "<URL для сокращения>"
+//	},
+//	...
+//
+// ]
+// В качестве ответа хендлер возвращает данные в формате:
+// [
+//
+//	{
+//	    "correlation_id": "<строковый идентификатор из объекта запроса>",
+//	    "short_url": "<результирующий сокращённый URL>"
+//	},
+//	...
+//
+// ]
 func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
+
+	logger.PrintLog(logger.DEBUG, `HandleAPIBatch`, s.LogEnabled)
 
 	contentBody, errBody := io.ReadAll(req.Body)
 	defer req.Body.Close()
@@ -227,7 +300,14 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		return
 	}
 
-	s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
+	logger.PrintLog(logger.DEBUG, `Body: `+string(contentBody), s.LogEnabled)
+
+	err := s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	resData, err := s.Storage.BatchSet()
 	additional := httpResp.Additional{
 		Place:     "body",
@@ -258,7 +338,12 @@ type output struct {
 }
 
 // HandleAPIShorten - функция метода HandleAPI, агрегирующая логику обработки одного URL через API.
+// Эндпоинт POST /api/shorten будет принимать в теле запроса JSON-объект {"url":"<some_url>"}
+// и возвращать в ответ объект {"result":"<short_url>"}.
+// Content-Type: application/json
 func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
+
+	logger.PrintLog(logger.DEBUG, `HandleAPIShorten`, s.LogEnabled)
 
 	contentBody, errBody := io.ReadAll(req.Body)
 	defer req.Body.Close()
@@ -289,7 +374,12 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	s.Storage.Init(apiData.URL, shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context(), s.Config)
+	err = s.Storage.Init(apiData.URL, shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	err = s.Storage.Set()
 
 	if err != nil {
@@ -322,7 +412,12 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		parentFuncName: `-`,
 	}
 
-	s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
+	err := s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	ok, err := s.Storage.Ping()
 	if ok {
 		httpResp.Ok(res)
