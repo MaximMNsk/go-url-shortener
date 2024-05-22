@@ -74,7 +74,6 @@ func AuthChecker(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), userNumber, UserID)
 		newReqCtx := r.WithContext(ctx)
 		next.ServeHTTP(w, newReqCtx)
-		return
 	})
 }
 

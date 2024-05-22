@@ -9,14 +9,12 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
-	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"strconv"
 	"time"
 )
 
@@ -38,43 +36,27 @@ const layer = `DB`
 // DBStorage - структура объекта, который создается при инициализации
 // и используется для взаимодействия с хранилищем.
 //
-// Данные передаются в полях объекта.
-//
 // Состоит из:
-// Ctx - контекст запроса.
-// Link - исходная ссылка, которую необходимо сократить.
-// ShortLink - результат сокращения.
-// ID - идентификатор сокращенной ссылки без имени хоста.
-// DeletedFlag - признак наличия УРЛ в хранилище.
 // ToDeleteCh - канал для массового удаления УРЛ.
 // ConnectionPool - пул, из которого выбирается соединение для работы с хранилищем.
 // Cfg - конфигурация, которая инициализируется при запуске.
 type DBStorage struct {
-	Ctx            context.Context
-	Link           string `json:"original_url"`
-	ShortLink      string `json:"short_url"`
-	ID             string `json:"correlation_id"`
-	DeletedFlag    bool   `json:"is_deleted"`
 	ToDeleteCh     chan DeleteItem
 	ConnectionPool *pgxpool.Pool
 	Cfg            confModule.OuterConfig
 }
 
 // Init - метод создает для каждого запроса объект.
-func (jsonData *DBStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) error {
-	jsonData.Ctx = ctx
-	jsonData.ID = id
-	jsonData.Link = link
-	jsonData.ShortLink = shortLink
-	jsonData.DeletedFlag = isDeleted
-	jsonData.Cfg = cfg
-	err := prepare(cfg.Final.DB)
+func (dbs *DBStorage) Init() error {
+	dbs.ToDeleteCh = make(chan DeleteItem)
+	err := prepare(dbs.Cfg.Final.DB)
 	return err
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (jsonData *DBStorage) Destroy() {
-	db.Close(jsonData.ConnectionPool)
+func (dbs *DBStorage) Destroy() {
+	close(dbs.ToDeleteCh)
+	db.Close(dbs.ConnectionPool)
 }
 
 const insertLinkRow = `
@@ -85,7 +67,7 @@ const insertLinkRowBatch = `
 insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
-select uid, original_url, short_url, is_deleted from public.short_links where (uid = $1 or original_url = $2)`
+select original_url, is_deleted from public.short_links where (uid = $1 or original_url = $1)`
 
 const selectRowByUser = `
 select uid, original_url, short_url from public.short_links where (uid = $1 or original_url = $2) and user_id = $3`
@@ -127,9 +109,9 @@ func prepare(dsn string) error {
 }
 
 // Ping - прикладной метод для проверки работоспособности хранилища.
-func (jsonData *DBStorage) Ping() (bool, error) {
+func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 
-	err := jsonData.ConnectionPool.Ping(jsonData.Ctx)
+	err := dbs.ConnectionPool.Ping(ctx)
 	if err != nil {
 		pingErr := fmt.Errorf(`%w`, &ErrorDB{
 			layer:          layer,
@@ -146,7 +128,8 @@ func (jsonData *DBStorage) Ping() (bool, error) {
 // Первый возвращаемый параметр - сокращенный УРЛ,
 // второй - флаг присутствия,
 // третий - ошибка выполнения.
-func (jsonData *DBStorage) Get() (string, bool, error) {
+func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, error) {
+
 	getErr := ErrorDB{
 		layer:          layer,
 		parentFuncName: `-`,
@@ -154,58 +137,39 @@ func (jsonData *DBStorage) Get() (string, bool, error) {
 		message:        `Error occurred`,
 	}
 
-	row, err := getData(*jsonData)
+	acquire, err := dbs.ConnectionPool.Acquire(ctx)
 	if err != nil {
-		return ``, false, fmt.Errorf(getErr.Error()+`%w`, err)
-	}
-	return row.Link, row.DeletedFlag, nil
-}
-
-func getData(data DBStorage) (DBStorage, error) {
-
-	var selected DBStorage
-	connection := data.ConnectionPool
-
-	getDataErr := ErrorDB{
-		layer:          layer,
-		parentFuncName: `Get`,
-		funcName:       `getData`,
-	}
-
-	userID := `0`
-	reqUserID := data.Ctx.Value(cookie.UserNum(`UserID`))
-	if reqUserID != nil {
-		userID = strconv.Itoa(reqUserID.(int))
-	}
-
-	acquire, err := connection.Acquire(data.Ctx)
-	if err != nil {
-		getDataErr.message = err.Error()
-		return selected, &getDataErr
+		getErr.message = err.Error()
+		return ``, false, &getErr
 	}
 	defer acquire.Release()
 
-	if connection == nil {
+	if acquire == nil {
 		connErr := errors.New("connection to DB not found")
-		getDataErr.message = connErr.Error()
-		return selected, &getDataErr
+		getErr.message = connErr.Error()
+		return ``, false, &getErr
 	}
+
+	var URL string
+	var isDeleted bool
+
 	query := selectRow
-	row := acquire.QueryRow(data.Ctx, query, data.ID, data.Link)
+	row := acquire.QueryRow(ctx, query, requestID)
 
-	err = row.Scan(&selected.ID, &selected.Link, &selected.ShortLink, &selected.DeletedFlag)
+	err = row.Scan(&URL, &isDeleted)
 	if err != nil {
-		getDataErr.message = fmt.Sprintf(`Error: %v, ID: %s, Link: %s, UserID: %s`,
-			err, data.ID, data.Link, userID)
-		return selected, &getDataErr
+		getErr.message = fmt.Sprintf(`Error: %v, ID: %s`,
+			err, requestID)
+		return ``, false, &getErr
 	}
 
-	return selected, nil
+	return URL, isDeleted, nil
+
 }
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (jsonData *DBStorage) Set() error {
+func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
 
 	errSet := ErrorDB{
 		layer:          layer,
@@ -213,52 +177,18 @@ func (jsonData *DBStorage) Set() error {
 		parentFuncName: `-`,
 	}
 
-	err := saveData(*jsonData)
-
+	acquire, err := dbs.ConnectionPool.Acquire(ctx)
 	if err != nil {
-		errSet.message = `cannot set data to database`
+		errSet.message = `cant acquire connection`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
-	}
-	return nil
-}
-
-//go:generate go run github.com/vektra/mockery/v2@v2.43.0 --name=DataSaver
-type DataSaver interface {
-	saveData(data DBStorage) error
-}
-
-func saveData(data DBStorage) error {
-
-	errSave := ErrorDB{
-		layer:          layer,
-		funcName:       `saveData`,
-		parentFuncName: `Set`,
-	}
-
-	connection := data.ConnectionPool
-	if connection == nil {
-		errSave.message = `connection to DB not found`
-		return &errSave
-	}
-
-	acquire, err := connection.Acquire(data.Ctx)
-	if err != nil {
-		errSave.message = `cant acquire connection`
-		return fmt.Errorf(errSave.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
-	userID := `0`
-	reqUserID := data.Ctx.Value(cookie.UserNum(`UserID`))
-	if reqUserID != nil {
-		userID = strconv.Itoa(reqUserID.(int))
-	}
-
-	_, err = acquire.Exec(data.Ctx, insertLinkRow, data.Link, data.ShortLink, data.ID, userID)
+	_, err = acquire.Exec(ctx, insertLinkRow, originalLink, shortLink, hashLink, userID)
 
 	if err != nil {
-		errSave.message = `cannot insert row`
-		dbErr := fmt.Errorf(errSave.Error()+`: %w`, err)
+		errSet.message = `cannot insert row`
+		dbErr := fmt.Errorf(errSet.Error()+`: %w`, err)
 		return fmt.Errorf(dbErr.Error()+`: %w`, err)
 	}
 
@@ -270,11 +200,17 @@ type outputBatch struct {
 	ShortURL      string `json:"short_url"`
 }
 
+type inputBatch struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalLink  string `json:"original_url"`
+	ShortLink     string
+}
+
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (jsonData *DBStorage) BatchSet() ([]byte, error) {
+func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
 
-	var savingData []DBStorage
+	var savingData []inputBatch
 	var outputData []outputBatch
 
 	errBatchSet := ErrorDB{
@@ -283,34 +219,28 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
+	err := json.Unmarshal(data, &savingData)
 	if err != nil {
 		errBatchSet.message = `unmarshal error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
+		shortLink := shorter.GetShortURL(dbs.Cfg.Final.ShortURLAddr, v.CorrelationID)
 
-		savingData[i].ID = v.ID
+		savingData[i].CorrelationID = v.CorrelationID
 		savingData[i].ShortLink = shortLink
-		savingData[i].Link = v.Link
+		savingData[i].OriginalLink = v.OriginalLink
 
-		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
+		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.CorrelationID})
 	}
 
-	userID := `0`
-	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
-	if reqUserID != nil {
-		userID = strconv.Itoa(reqUserID.(int))
-	}
-
-	if jsonData.ConnectionPool == nil {
+	if dbs.ConnectionPool == nil {
 		errBatchSet.message = "connection to DB not found"
 		return nil, &errBatchSet
 	}
 
-	acquire, err := jsonData.ConnectionPool.Acquire(jsonData.Ctx)
+	acquire, err := dbs.ConnectionPool.Acquire(ctx)
 	if err != nil {
 		errBatchSet.message = "cannot acquire connection"
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
@@ -319,9 +249,9 @@ func (jsonData *DBStorage) BatchSet() ([]byte, error) {
 
 	var batch pgx.Batch
 	for _, v := range savingData {
-		batch.Queue(insertLinkRowBatch, v.Link, v.ShortLink, v.ID, userID)
+		batch.Queue(insertLinkRowBatch, v.OriginalLink, v.ShortLink, v.CorrelationID, userID)
 	}
-	br := acquire.SendBatch(jsonData.Ctx, &batch)
+	br := acquire.SendBatch(ctx, &batch)
 	defer br.Close()
 	_, errPg := br.Exec()
 
@@ -348,7 +278,7 @@ type JSONCutted struct {
 
 // HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
 // Так же возвращает результат обработки запроса.
-func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
+func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
 	var batchResp []JSONCutted
 
 	errHandleUserUrls := ErrorDB{
@@ -357,25 +287,19 @@ func (jsonData *DBStorage) HandleUserUrls() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	if jsonData.ConnectionPool == nil {
+	if dbs.ConnectionPool == nil {
 		errHandleUserUrls.message = "connection to DB not found"
 		return nil, &errHandleUserUrls
 	}
 
-	acquire, err := jsonData.ConnectionPool.Acquire(jsonData.Ctx)
+	acquire, err := dbs.ConnectionPool.Acquire(ctx)
 	if err != nil {
 		errHandleUserUrls.message = "cannot acquire connection"
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 	}
 	defer acquire.Release()
 
-	userID := `0`
-	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
-	if reqUserID != nil {
-		userID = strconv.Itoa(reqUserID.(int))
-	}
-
-	rows, err := acquire.Query(jsonData.Ctx, selectAllRows, userID)
+	rows, err := acquire.Query(ctx, selectAllRows, userID)
 	if err != nil {
 		errHandleUserUrls.message = "select error"
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
@@ -407,32 +331,23 @@ type DeleteItem struct {
 	UserID int
 }
 
-var toDeleteCh chan DeleteItem
-
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
-func (jsonData *DBStorage) HandleUserUrlsDelete() {
-	userID := 0
-	reqUserID := jsonData.Ctx.Value(cookie.UserNum(`UserID`))
-	if reqUserID != nil {
-		userID = reqUserID.(int)
-	}
+func (dbs *DBStorage) HandleUserUrlsDelete(links string, userID int) {
 
 	inputData := DeleteItem{
-		URLs:   jsonData.Link,
+		URLs:   links,
 		UserID: userID,
 	}
 
 	go func() {
-		toDeleteCh <- inputData
+		dbs.ToDeleteCh <- inputData
 	}()
 }
 
 // AsyncSaver - метод-демон, который работает асинхронно.
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
-func (jsonData *DBStorage) AsyncSaver() {
-	toDeleteCh = make(chan DeleteItem)
-	defer close(toDeleteCh)
+func (dbs *DBStorage) AsyncSaver() {
 
 	errHandleUserUrlsDelete := ErrorDB{
 		layer:          layer,
@@ -441,18 +356,18 @@ func (jsonData *DBStorage) AsyncSaver() {
 	}
 
 	for {
-		if toDeleteCh == nil {
+		if dbs.ToDeleteCh == nil {
 			time.Sleep(100 * time.Millisecond)
 			continue
 		}
 		select {
-		case data, ok := <-toDeleteCh:
+		case data, ok := <-dbs.ToDeleteCh:
 			if !ok {
 				errHandleUserUrlsDelete.message = `channel reading error`
 				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error(), true)
 				continue
 			}
-			err := batchUpdate(data.URLs, jsonData.ConnectionPool)
+			err := dbs.BatchUpdate(context.Background(), data.URLs, data.UserID)
 			if err != nil {
 				errHandleUserUrlsDelete.message = `update error`
 				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error(), true)
@@ -490,7 +405,7 @@ func ExplodeURLs(data string) ([]string, error) {
 	return result, nil
 }
 
-func batchUpdate(links string, pool *pgxpool.Pool) error {
+func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, userID int) error {
 
 	errBatchUpdate := ErrorDB{
 		layer:          layer,
@@ -504,13 +419,7 @@ func batchUpdate(links string, pool *pgxpool.Pool) error {
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 
-	ctx := context.Background()
-	if pool == nil {
-		errBatchUpdate.message = `connection to DB not found`
-		return &errBatchUpdate
-	}
-
-	acquire, err := pool.Acquire(ctx)
+	acquire, err := dbs.ConnectionPool.Acquire(ctx)
 	if err != nil {
 		errBatchUpdate.message = `acquire error`
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)

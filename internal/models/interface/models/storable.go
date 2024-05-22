@@ -3,7 +3,6 @@ package models
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
 )
 
 // Storable - интерфейс для создания
@@ -12,31 +11,34 @@ import (
 type Storable interface {
 
 	// Init - метод Инициализации хранилища.
-	Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg config.OuterConfig) error
+	Init() error
 
 	// Get - получение данных из хранилища, где:
 	// первое значение - данные,
 	// второе значение - отметка об удалении,
 	// третье - ошибка.
-	Get() (string, bool, error)
+	Get(ctx context.Context, shortLink string) (string, bool, error)
 
 	// Set - сохранение данных структуры объекта.
-	Set() error
+	Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error
 
 	// Ping - проверка работоспособности хранилища.
-	Ping() (bool, error)
+	Ping(ctx context.Context) (bool, error)
 
 	// BatchSet - сохранение пакета значений, переданного в структуре объекта.
 	// Возвращает первым значением JSON объект в виде байт-кода,
 	// вторым - ошибку если есть.
-	BatchSet() ([]byte, error)
+	BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error)
+
+	// BatchUpdate - изменяет статус на удаленный для записей
+	//BatchUpdate(ctx context.Context, links string, userID int) error
 
 	// HandleUserUrls - аналог BatchSet для конкретного пользователя.
-	HandleUserUrls() ([]byte, error)
+	HandleUserUrls(ctx context.Context, userID int) ([]byte, error)
 
 	// HandleUserUrlsDelete - удаляет шортлинки для пользователя,
 	// переданные в структуре объекта. Передает данные в канал.
-	HandleUserUrlsDelete()
+	HandleUserUrlsDelete(links string, userID int)
 
 	// AsyncSaver - асинхронно сохраняет инфо, переданную в канал методом HandleUserUrlsDelete.
 	// Работает как демон.

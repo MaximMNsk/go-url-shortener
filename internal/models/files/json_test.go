@@ -2,135 +2,135 @@ package files
 
 import (
 	"context"
-	"fmt"
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io"
-	"os"
 	"path/filepath"
 	"testing"
 )
 
-var Conf confModule.OuterConfig
-var ConfErr error
-
-func copyFile(src, dst string) (int64, error) {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return 0, err
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return 0, fmt.Errorf("%s is not a regular file", src)
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return 0, err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return 0, err
-	}
-	defer destination.Close()
-	nBytes, err := io.Copy(destination, source)
-
-	return nBytes, err
-}
-
-func restoreFile(source, dest string) error {
-	errRemove := os.Remove(dest)
-	if errRemove != nil {
-		return errRemove
-	}
-	_, err := copyFile(source, dest)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func TestJSONDataSet_Set(t *testing.T) {
-	ConfErr = Conf.InitConfig(true)
-	type fields struct {
-		Link      string
-		ShortLink string
-		ID        string
-	}
-	type args struct {
-		fileName string
+func TestFileStorage_Init(t *testing.T) {
+	type want struct {
+		DBErr ErrorFile
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
+		name string
+		want want
+	}{
+		{
+			name: `Test Init`,
+			want: want{
+				DBErr: ErrorFile{
+					layer:          layer,
+					parentFuncName: ``,
+					funcName:       `prepare`,
+					message:        ``,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg config.OuterConfig
+			ConfErr := cfg.InitConfig(true)
+			require.NoError(t, ConfErr)
+			var Store = FileStorage{
+				Cfg: cfg,
+			}
+
+			err := Store.Init()
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestFileStorage_Set(t *testing.T) {
+
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
+
+	type args struct {
+		fileName  string
+		link      string
+		shortLink string
+		hashLink  string
+	}
+	tests := []struct {
+		name string
+		args args
 	}{
 		{
 			name: "Set",
-			fields: fields{
-				Link:      "TestLink",
-				ShortLink: "TestShortLink",
-				ID:        "TestID",
+			args: args{
+				fileName:  filepath.Join(cfg.Default.LinkFile),
+				link:      `aaa`,
+				shortLink: `http://localhost:8080:bbb`,
+				hashLink:  `bbb`,
 			},
-			args: args{fileName: filepath.Join(Conf.Default.LinkFile)},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, ConfErr)
-			jsonData := &FileStorage{}
-			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background(), Conf)
-			err := jsonData.Set()
-			assert.NoError(t, err)
+			require.NoError(t, errCfg)
+
+			var file FileStorage
+			file.Cfg = cfg
+			//file.Cfg.Final.LinkFile = cfg.Default.LinkFile
+			err := file.Init()
+			require.NoError(t, err)
+
+			err = file.Set(context.Background(), tt.args.link, tt.args.shortLink, tt.args.hashLink, 0)
+			require.NoError(t, err)
 			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
 }
 
-func TestJSONDataGet_Get(t *testing.T) {
-	ConfErr = Conf.InitConfig(true)
-	type fields struct {
-		Link      string
-		ShortLink string
-		ID        string
+func TestFileStorage_Get(t *testing.T) {
+
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
+
+	type want struct {
+		link      string
+		shortLink string
 	}
-	type want FileStorage
 	type args struct {
-		fileName       string
-		sourceFileName string
+		fileName string
+		hashLink string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   want
+		name string
+		args args
+		want want
 	}{
 		{
 			name: "Get",
-			fields: fields{
-				Link: "TestLink",
-			},
 			args: args{
-				fileName: filepath.Join(Conf.Default.LinkFile),
+				fileName: filepath.Join(cfg.Default.LinkFile),
+				hashLink: `bbb`,
 			},
-			want: want(FileStorage{
-				Link:      "TestLink",
-				ShortLink: "TestShortLink",
-				ID:        "TestID",
-			}),
+			want: want{
+				link:      `aaa`,
+				shortLink: `http://localhost:8080:bbb`,
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.FileExists(t, tt.args.fileName)
-			jsonData := FileStorage{}
-			jsonData.Init(tt.fields.Link, tt.fields.ShortLink, tt.fields.ID, false, context.Background(), Conf)
-			link, _, err := jsonData.Get()
-			assert.NoError(t, err)
-			assert.EqualValues(t, tt.want.Link, link)
+			require.NoError(t, errCfg)
+
+			file := FileStorage{
+				Cfg: cfg,
+			}
+			err := file.Init()
+			require.NoError(t, err)
+
+			link, _, err := file.Get(context.Background(), tt.args.hashLink)
+			require.NoError(t, err)
+			require.Equal(t, tt.want.link, link)
 		})
 	}
 }

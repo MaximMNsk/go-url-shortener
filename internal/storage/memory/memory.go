@@ -27,3 +27,8 @@ func (s *Storage) Set(data StorageItem) {
 func (s *Storage) Get() []StorageItem {
 	return s.data
 }
+
+// Clear - делает пустым хранилище.
+func (s *Storage) Clear() {
+	s.data = make([]StorageItem, 0)
+}

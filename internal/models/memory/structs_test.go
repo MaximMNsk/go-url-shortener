@@ -8,56 +8,55 @@ import (
 	"testing"
 )
 
-func TestMemStorage_Init(t *testing.T) {
-	type args struct {
-		MemStorage
-	}
-	type want struct{}
+var Store MemStorage
 
+func TestMemStorage_Init(t *testing.T) {
+	type want struct {
+		MemErr ErrorMemory
+	}
 	tests := []struct {
 		name string
-		args args
 		want want
 	}{
 		{
 			name: `Test Init`,
-			args: args{
-				MemStorage{},
+			want: want{
+				MemErr: ErrorMemory{
+					layer:          layer,
+					parentFuncName: ``,
+					funcName:       `prepare`,
+					message:        ``,
+				},
 			},
-			want: want{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.OuterConfig{}
-			err := cfg.InitConfig(true)
-			require.NoError(t, err)
-			storage := &MemStorage{}
-			err = storage.Init(tt.args.Link, tt.args.ShortLink, tt.args.ID, tt.args.DeletedFlag, tt.args.Ctx, cfg)
+			var cfg config.OuterConfig
+			ConfErr := cfg.InitConfig(true)
+			require.NoError(t, ConfErr)
+			Store = MemStorage{
+				Cfg: cfg,
+			}
+
+			err := Store.Init()
 			require.NoError(t, err)
 		})
 	}
 }
 
 func TestMemStorage_Ping(t *testing.T) {
-	type args struct {
-		MemStorage
-	}
 	type want struct {
 		pingRes bool
 	}
 
 	tests := []struct {
 		name string
-		args args
 		want want
 	}{
 		{
 			name: `Test Init`,
-			args: args{
-				MemStorage{},
-			},
 			want: want{
 				pingRes: true,
 			},
@@ -66,13 +65,10 @@ func TestMemStorage_Ping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.OuterConfig{}
+			var cfg config.OuterConfig
 			err := cfg.InitConfig(true)
 			require.NoError(t, err)
-			storage := &MemStorage{}
-			err = storage.Init(tt.args.Link, tt.args.ShortLink, tt.args.ID, tt.args.DeletedFlag, tt.args.Ctx, cfg)
-			require.NoError(t, err)
-			res, err := storage.Ping()
+			res, err := Store.Ping(context.Background())
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.pingRes, res)
 		})
@@ -80,112 +76,72 @@ func TestMemStorage_Ping(t *testing.T) {
 }
 
 func TestMemStorage_Set(t *testing.T) {
-	type args struct {
-		MemStorage
-	}
-	type want struct{}
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
 
+	type args struct {
+		link      string
+		shortLink string
+		hashLink  string
+	}
 	tests := []struct {
 		name string
 		args args
-		want want
 	}{
 		{
-			name: `Test set`,
+			name: "Set",
 			args: args{
-				MemStorage{
-					Link:        "ya.ru",
-					ShortLink:   "ssssssssss",
-					ID:          "ssssssssss",
-					DeletedFlag: false,
-				},
+				link:      `aaa`,
+				shortLink: `http://localhost:8080:bbb`,
+				hashLink:  `bbb`,
 			},
-			want: want{},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.OuterConfig{}
-			err := cfg.InitConfig(true)
-			require.NoError(t, err)
-			storage := &MemStorage{}
-			err = storage.Init(tt.args.Link, tt.args.ShortLink, tt.args.ID, tt.args.DeletedFlag, tt.args.Ctx, cfg)
-			require.NoError(t, err)
-			err = storage.Set()
+			require.NoError(t, errCfg)
+
+			err := Store.Set(context.Background(), tt.args.link, tt.args.shortLink, tt.args.hashLink, 0)
 			require.NoError(t, err)
 		})
 	}
 }
 
 func TestMemStorage_Get(t *testing.T) {
-	type args struct {
-		MemStorage
-	}
-	type want struct {
-		URL      string
-		isDelete bool
-	}
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
 
+	type want struct {
+		link      string
+		shortLink string
+	}
+	type args struct {
+		fileName string
+		hashLink string
+	}
 	tests := []struct {
 		name string
 		args args
 		want want
 	}{
 		{
-			name: `Test get`,
+			name: "Get",
 			args: args{
-				MemStorage{
-					Link:        "ya.ru",
-					ShortLink:   "ssssssssss",
-					ID:          "ssssssssss",
-					DeletedFlag: false,
-					Ctx:         context.Background(),
-				},
+				hashLink: `bbb`,
 			},
 			want: want{
-				URL:      `ya.ru`,
-				isDelete: false,
+				link:      `aaa`,
+				shortLink: `http://localhost:8080:bbb`,
 			},
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.OuterConfig{}
-			err := cfg.InitConfig(true)
-			require.NoError(t, err)
-			storage := &MemStorage{}
-			err = storage.Init(tt.args.Link, tt.args.ShortLink, tt.args.ID, tt.args.DeletedFlag, tt.args.Ctx, cfg)
-			require.NoError(t, err)
-			err = storage.Set()
-			require.NoError(t, err)
-			URL, isDelete, err := storage.Get()
-			require.NoError(t, err)
-			assert.Equal(t, tt.want.URL, URL)
-			assert.Equal(t, tt.want.isDelete, isDelete)
-		})
-	}
-}
+			require.NoError(t, errCfg)
 
-func TestMemStorage_Destroy(t *testing.T) {
-	tests := []struct {
-		name string
-	}{
-		{
-			name: `Test get`,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := config.OuterConfig{}
-			err := cfg.InitConfig(true)
+			link, _, err := Store.Get(context.Background(), tt.args.hashLink)
 			require.NoError(t, err)
-			storage := &MemStorage{}
-			err = storage.Init(``, ``, ``, false, context.Background(), cfg)
-			require.NoError(t, err)
-			storage.Destroy()
+			require.Equal(t, tt.want.link, link)
 		})
 	}
 }

@@ -15,12 +15,12 @@ func Connect(ctx context.Context, conf config.OuterConfig) (*pgxpool.Pool, error
 	if err != nil {
 		return nil, err
 	}
-	cfg.MaxConns = 4
+	cfg.MaxConns = 16
 	cfg.MinConns = 1
-	cfg.HealthCheckPeriod = 5 * time.Second
+	cfg.HealthCheckPeriod = 1 * time.Minute
 	cfg.MaxConnLifetime = 1 * time.Hour
 	cfg.MaxConnIdleTime = 1 * time.Minute
-	cfg.ConnConfig.ConnectTimeout = 10 * time.Second
+	cfg.ConnConfig.ConnectTimeout = 20 * time.Second
 
 	database, err := pgxpool.NewWithConfig(ctx, cfg)
 	return database, err

@@ -54,15 +54,9 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	}
 
 	// Пришел ид.
-	requestID := req.URL.Path[1:]
+	linkHash := req.URL.Path[1:]
 
-	err := s.Storage.Init(``, ``, requestID, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	saved, deleted, err := s.Storage.Get()
+	saved, deleted, err := s.Storage.Get(req.Context(), linkHash)
 	// 400.
 	if err != nil {
 		logger.PrintLog(logger.WARN, "Get exception: "+err.Error(), s.LogEnabled)
@@ -108,40 +102,39 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 
 	contentBody, errBody := io.ReadAll(req.Body)
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			httpResp.BadRequest(res)
-			return
-		}
-	}(req.Body)
+	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
 	}
 
+	if len(contentBody) == 0 {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	// Пришел урл
-	linkID := sha1hash.Create(string(contentBody), 8)
-	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID)
+	linkHash := sha1hash.Create(string(contentBody), 8)
+	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkHash)
+	originalLink := string(contentBody)
+	userID := req.Context().Value(cookie.UserNum(`UserID`))
+
+	if userID == nil {
+		userID = 0
+	}
 
 	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: shortLink,
 	}
 
-	err := s.Storage.Init(string(contentBody), shortLink, linkID, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	setErr := s.Storage.Set()
+	setErr := s.Storage.Set(req.Context(), originalLink, shortLink, linkHash, userID.(int))
 
 	if setErr != nil {
 		var pgErrType *pgconn.PgError
 		if errors.As(setErr, &pgErrType) {
 			if pgErrType.Code == pgerrcode.UniqueViolation {
-				txt := fmt.Sprintf(`Can not set link data: %s, body: %s`, setErr.Error(), string(contentBody))
+				txt := fmt.Sprintf(`Can not set link data: %s, body: %s, linkID: %s`, setErr.Error(), string(contentBody), linkHash)
 				logger.PrintLog(logger.WARN, txt, s.LogEnabled)
 				httpResp.Conflict(res, additional)
 				return
@@ -218,13 +211,8 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	}
 	httpResp.Accepted(res, httpResp.Additional{})
 
-	err := s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	s.Storage.HandleUserUrlsDelete()
+	userID := req.Context().Value(cookie.UserNum(`UserID`))
+	s.Storage.HandleUserUrlsDelete(string(contentBody), userID.(int))
 }
 
 // HandleAPIUserUrls - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
@@ -243,13 +231,8 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 
 	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrls`, s.LogEnabled)
 
-	err := s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	byteRes, err := s.Storage.HandleUserUrls()
+	userID := req.Context().Value(cookie.UserNum(`UserID`))
+	byteRes, err := s.Storage.HandleUserUrls(req.Context(), userID.(int))
 
 	if err != nil {
 		httpResp.BadRequest(res)
@@ -302,13 +285,9 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 
 	logger.PrintLog(logger.DEBUG, `Body: `+string(contentBody), s.LogEnabled)
 
-	err := s.Storage.Init(string(contentBody), ``, ``, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
+	userID := req.Context().Value(cookie.UserNum(`UserID`))
 
-	resData, err := s.Storage.BatchSet()
+	resData, err := s.Storage.BatchSet(req.Context(), contentBody, userID.(int))
 	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: string(resData),
@@ -358,8 +337,10 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		httpResp.BadRequest(res)
 		return
 	}
-	linkID := sha1hash.Create(apiData.URL, 8)
-	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID)
+	linkHash := sha1hash.Create(apiData.URL, 8)
+	shortLink := shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkHash)
+	originalLink := apiData.URL
+	userID := req.Context().Value(cookie.UserNum(`UserID`))
 
 	var resp output
 	resp.Result = shortLink
@@ -374,13 +355,7 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 		InnerData: string(JSONResp),
 	}
 
-	err = s.Storage.Init(apiData.URL, shorter.GetShortURL(s.Config.Final.ShortURLAddr, linkID), linkID, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	err = s.Storage.Set()
+	err = s.Storage.Set(req.Context(), originalLink, shortLink, linkHash, userID.(int))
 
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -412,13 +387,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		parentFuncName: `-`,
 	}
 
-	err := s.Storage.Init(``, ``, ``, false, req.Context(), s.Config)
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	ok, err := s.Storage.Ping()
+	ok, err := s.Storage.Ping(req.Context())
 	if ok {
 		httpResp.Ok(res)
 		return
@@ -446,43 +415,51 @@ func HandleOther(next http.Handler) http.Handler {
 // Работает с конфигурацией, которую принимает вторым параметром.
 // Возвращает модель для работы с хранилищем и ошибку.
 func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Storable, error) {
+	pgCsErr := &ErrorHandlers{
+		layer:          `Handlers`,
+		funcName:       `ChooseStorage`,
+		parentFuncName: `-`,
+	}
+
 	var storage model.Storable
 	if conf.Env.DB != "" || conf.Flag.DB != "" {
-		pgPoolErr := &ErrorHandlers{
-			layer:          `Handlers`,
-			funcName:       `ChooseStorage`,
-			parentFuncName: `-`,
-		}
 		pgPool, err := db.Connect(ctx, conf)
 		if err != nil {
-			pgPoolErr.message = `failed connect to DB`
-			return &database.DBStorage{}, pgPoolErr
+			return nil, err
 		}
+
 		storage = &database.DBStorage{
 			ConnectionPool: pgPool,
 			Cfg:            conf,
+		}
+		err = storage.Init()
+		if err != nil {
+			pgCsErr.message = `can't init DB storage`
+			return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 		}
 
 		go storage.AsyncSaver()
 		return storage, nil
 	}
 	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
-		pgFileErr := &ErrorHandlers{
-			layer:          `Handlers`,
-			funcName:       `ChooseStorage`,
-			parentFuncName: `-`,
-		}
 
-		storage = &files.FileStorage{}
-		err := files.MakeStorageFile(conf.Final.LinkFile)
+		storage = &files.FileStorage{
+			Cfg: conf,
+		}
+		err := storage.Init()
 		if err != nil {
-			pgFileErr.message = `can't init file storage`
-			return storage, fmt.Errorf(pgFileErr.Error()+`: %w`, err)
+			pgCsErr.message = `can't init file storage`
+			return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 		}
 		return storage, nil
 	}
 	storage = &memory.MemStorage{
 		Storage: memoryStorage.Storage{},
+	}
+	err := storage.Init()
+	if err != nil {
+		pgCsErr.message = `can't init memory storage`
+		return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 	}
 	return storage, nil
 }
@@ -543,6 +520,7 @@ func (s *Server) Start() error {
 		})
 		s.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthSetter)
+
 			r.Post(`/`, s.HandlePOST)
 			r.Post(`/api/{query}`, s.HandleAPI)
 			r.Post(`/api/shorten/{query}`, s.HandleAPI)
@@ -551,6 +529,7 @@ func (s *Server) Start() error {
 		})
 		s.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)
+
 			r.Delete(`/api/user/{query}`, s.HandleAPI)
 			r.Get(`/api/user/{query}`, s.HandleAPI)
 		})

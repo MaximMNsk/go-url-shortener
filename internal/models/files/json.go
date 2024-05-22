@@ -31,31 +31,21 @@ const layer = `File`
 
 // FileStorage - основная структура хранения.
 type FileStorage struct {
-	Link        string `json:"original_url"`
-	ShortLink   string `json:"short_url"`
-	ID          string `json:"correlation_id"`
-	DeletedFlag bool   `json:"is_deleted"`
-	Cfg         confModule.OuterConfig
-	Ctx         context.Context
+	Cfg confModule.OuterConfig
 }
 
 // Init - метод создает для каждого запроса объект.
-func (jsonData *FileStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) error {
-	jsonData.ID = id
-	jsonData.Link = link
-	jsonData.ShortLink = shortLink
-	jsonData.Ctx = ctx
-	jsonData.DeletedFlag = isDeleted
-	jsonData.Cfg = cfg
-	return nil
+func (fs *FileStorage) Init() error {
+	err := MakeStorageFile(fs.Cfg.Final.LinkFile)
+	return err
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (jsonData *FileStorage) Destroy() {
+func (fs *FileStorage) Destroy() {
 }
 
 // Ping - метод для проверки работоспособности хранилища.
-func (jsonData *FileStorage) Ping() (bool, error) {
+func (fs *FileStorage) Ping(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
@@ -70,7 +60,7 @@ type inputOutputData struct {
 // Первый возвращаемый параметр - сокращенный УРЛ,
 // второй - флаг присутствия,
 // третий - ошибка выполнения.
-func (jsonData *FileStorage) Get() (string, bool, error) {
+func (fs *FileStorage) Get(ctx context.Context, shortLink string) (string, bool, error) {
 
 	var savedData []inputOutputData
 	getErr := ErrorFile{
@@ -79,7 +69,7 @@ func (jsonData *FileStorage) Get() (string, bool, error) {
 		funcName:       `Get`,
 	}
 
-	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
+	jsonString, err := getData(fs.Cfg.Final.LinkFile)
 	if err != nil {
 		getErr.message = `get data error`
 		return "", false, fmt.Errorf(getErr.Error()+`: %w`, err)
@@ -90,11 +80,11 @@ func (jsonData *FileStorage) Get() (string, bool, error) {
 		return "", false, fmt.Errorf(getErr.Error()+`: %w`, err)
 	}
 	for _, v := range savedData {
-		if v.ID == jsonData.ID || v.Link == jsonData.Link {
+		if v.ID == shortLink || v.Link == shortLink {
 			return v.Link, v.DeletedFlag, nil
 		}
 	}
-	getErr.message = `no data found`
+	getErr.message = `no data found in ` + fs.Cfg.Final.LinkFile
 	return "", false, fmt.Errorf(`%w`, &getErr)
 }
 
@@ -141,10 +131,10 @@ func getData(fileName string) (string, error) {
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (jsonData *FileStorage) Set() error {
+func (fs *FileStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
 
 	var toSave []inputOutputData
-	var savedData []inputOutputData
+	var toLoad []inputOutputData
 
 	errSet := ErrorFile{
 		layer:          layer,
@@ -153,25 +143,25 @@ func (jsonData *FileStorage) Set() error {
 	}
 
 	preparedData := inputOutputData{
-		Link:        jsonData.Link,
-		ShortLink:   jsonData.ShortLink,
-		ID:          jsonData.ID,
-		DeletedFlag: jsonData.DeletedFlag,
+		Link:        originalLink,
+		ShortLink:   shortLink,
+		ID:          hashLink,
+		DeletedFlag: false,
 	}
 
-	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
+	jsonString, err := getData(fs.Cfg.Final.LinkFile)
 	if err != nil {
 		errSet.message = `can't get data`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	err = json.Unmarshal([]byte(jsonString), &savedData)
+	err = json.Unmarshal([]byte(jsonString), &toLoad)
 	if err != nil {
 		errSet.message = `cannot parse json data`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	toSave = append(savedData, preparedData)
+	toSave = append(toLoad, preparedData)
 	var content []byte
 	content, err = json.Marshal(toSave)
 	if err != nil {
@@ -179,9 +169,9 @@ func (jsonData *FileStorage) Set() error {
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	saveErr := saveData(content, jsonData.Cfg.Final.LinkFile)
+	saveErr := saveData(content, fs.Cfg.Final.LinkFile)
 	if saveErr != nil {
-		errSet.message = `saving data in ` + jsonData.Cfg.Final.LinkFile
+		errSet.message = `saving data in ` + fs.Cfg.Final.LinkFile
 		return fmt.Errorf(errSet.Error()+`: %w`, saveErr)
 	}
 	return nil
@@ -226,6 +216,15 @@ func MakeStorageFile(fileName string) error {
 		parentFuncName: `ChooseStorage`,
 	}
 
+	var fileExists = true
+	if _, err := os.Stat(fileName); errors.Is(err, os.ErrNotExist) {
+		fileExists = false
+	}
+
+	if fileExists {
+		return nil
+	}
+
 	var dir = filepath.Dir(fileName)
 
 	_, err := os.Stat(dir)
@@ -248,14 +247,15 @@ func MakeStorageFile(fileName string) error {
 	return nil
 }
 
-type outputBatch struct {
+type ioBatch struct {
 	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
+	OriginalLink  string `json:"original_url"`
+	ShortLink     string
 }
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (jsonData *FileStorage) BatchSet() ([]byte, error) {
+func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -267,27 +267,28 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	var savingData []FileStorage
-	var outputData []outputBatch
+	var savingData []ioBatch
+	var outputData []ioBatch
 
-	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
+	err := json.Unmarshal(data, &savingData)
 	if err != nil {
 		errBatchSet.message = `unmarshal error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
-		savingData[i].ID = v.ID
+		shortLink := shorter.GetShortURL(fs.Cfg.Final.ShortURLAddr, v.CorrelationID)
+
+		savingData[i].CorrelationID = v.CorrelationID
 		savingData[i].ShortLink = shortLink
 
-		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
+		outputData = append(outputData, ioBatch{ShortLink: shortLink, CorrelationID: v.CorrelationID})
 	}
 
-	var savedData []FileStorage
+	var savedData []ioBatch
 
 	var jsonString string
-	jsonString, err = getData(jsonData.Cfg.Final.LinkFile)
+	jsonString, err = getData(fs.Cfg.Final.LinkFile)
 	if err != nil {
 		errBatchSet.message = `get data error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
@@ -306,7 +307,7 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
-	saveErr := saveData(content, jsonData.Cfg.Final.LinkFile)
+	saveErr := saveData(content, fs.Cfg.Final.LinkFile)
 	if saveErr != nil {
 		errBatchSet.message = `can't save`
 		return []byte(""), fmt.Errorf(errBatchSet.Error()+`: %w`, saveErr)
@@ -321,16 +322,16 @@ func (jsonData *FileStorage) BatchSet() ([]byte, error) {
 	return JSONResp, nil
 }
 
-// JSONCutted - структура хранения входных/выходных данных для каждого УРЛ в пачке.
-type JSONCutted struct {
+// JSONCut - структура хранения входных/выходных данных для каждого УРЛ в пачке.
+type JSONCut struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
 }
 
 // HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
 // Так же возвращает результат обработки запроса.
-func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
-	var savedData []JSONCutted
+func (fs *FileStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
+	var savedData []JSONCut
 
 	errHandleUserUrls := ErrorFile{
 		layer:          layer,
@@ -338,7 +339,7 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	jsonString, err := getData(jsonData.Cfg.Final.LinkFile)
+	jsonString, err := getData(fs.Cfg.Final.LinkFile)
 	if err != nil {
 		errHandleUserUrls.message = `get data error`
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
@@ -364,10 +365,10 @@ func (jsonData *FileStorage) HandleUserUrls() ([]byte, error) {
 
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
-func (jsonData *FileStorage) HandleUserUrlsDelete() {
+func (fs *FileStorage) HandleUserUrlsDelete(links string, userID int) {
 }
 
 // AsyncSaver - метод-демон, который работает асинхронно.
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
-func (jsonData *FileStorage) AsyncSaver() {
+func (fs *FileStorage) AsyncSaver() {
 }

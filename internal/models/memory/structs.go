@@ -27,32 +27,22 @@ const layer = `Memory`
 
 // MemStorage - основная структура хранения.
 type MemStorage struct {
-	Link        string `json:"original_url"`
-	ShortLink   string `json:"short_url"`
-	ID          string `json:"correlation_id"`
-	DeletedFlag bool   `json:"is_deleted"`
-	Ctx         context.Context
-	Storage     memoryStorage.Storage
-	Cfg         confModule.OuterConfig
+	Storage memoryStorage.Storage
+	Cfg     confModule.OuterConfig
 }
 
 // Init - метод создает для каждого запроса объект.
-func (jsonData *MemStorage) Init(link, shortLink, id string, isDeleted bool, ctx context.Context, cfg confModule.OuterConfig) error {
-	jsonData.ID = id
-	jsonData.Link = link
-	jsonData.ShortLink = shortLink
-	jsonData.Ctx = ctx
-	jsonData.DeletedFlag = isDeleted
-	jsonData.Cfg = cfg
+func (ms *MemStorage) Init() error {
 	return nil
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (jsonData *MemStorage) Destroy() {
+func (ms *MemStorage) Destroy() {
+	ms.Storage.Clear()
 }
 
 // Ping - метод для проверки работоспособности хранилища.
-func (jsonData *MemStorage) Ping() (bool, error) {
+func (ms *MemStorage) Ping(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
@@ -60,13 +50,13 @@ func (jsonData *MemStorage) Ping() (bool, error) {
 // Первый возвращаемый параметр - сокращенный УРЛ,
 // второй - флаг присутствия,
 // третий - ошибка выполнения.
-func (jsonData *MemStorage) Get() (string, bool, error) {
+func (ms *MemStorage) Get(ctx context.Context, shortLink string) (string, bool, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
 
-	storageData := jsonData.Storage.Get()
+	storageData := ms.Storage.Get()
 
 	errGet := ErrorMemory{
 		layer:          layer,
@@ -76,43 +66,43 @@ func (jsonData *MemStorage) Get() (string, bool, error) {
 
 	if len(storageData) == 0 {
 		errGet.message = "data not found"
-		return "", false, &errGet
+		return ``, false, &errGet
 	}
 
 	for _, v := range storageData {
-		if v.ID == jsonData.ID || v.Link == jsonData.Link {
+		if v.ID == shortLink || v.Link == shortLink {
 			return v.Link, v.DeletedFlag, nil
 		}
 	}
 	errGet.message = "data not found"
-	return "", false, &errGet
+	return ``, false, &errGet
 }
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (jsonData *MemStorage) Set() error {
+func (ms *MemStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
 
-	storageData := jsonData.Storage.Get()
+	storageData := ms.Storage.Get()
 
 	if len(storageData) != 0 {
 		for _, v := range storageData {
-			if v.Link == jsonData.Link {
+			if v.Link == originalLink {
 				return nil
 			}
 		}
 	}
 
 	var toStore = memoryStorage.StorageItem{
-		Link:        jsonData.Link,
-		ShortLink:   jsonData.ShortLink,
-		ID:          jsonData.ID,
-		DeletedFlag: jsonData.DeletedFlag,
+		Link:        originalLink,
+		ShortLink:   shortLink,
+		ID:          hashLink,
+		DeletedFlag: false,
 	}
-	jsonData.Storage.Set(toStore)
+	ms.Storage.Set(toStore)
 
 	return nil
 }
@@ -124,7 +114,7 @@ type outputBatch struct {
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (jsonData *MemStorage) BatchSet() ([]byte, error) {
+func (ms *MemStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -136,17 +126,17 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	var savingData []MemStorage
+	var savingData []memoryStorage.StorageItem
 	var outputData []outputBatch
 
-	err := json.Unmarshal([]byte(jsonData.Link), &savingData)
+	err := json.Unmarshal(data, &savingData)
 	if err != nil {
 		errBatchSet.message = `unmarshal error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
 	for i, v := range savingData {
-		shortLink := shorter.GetShortURL(jsonData.Cfg.Final.ShortURLAddr, v.ID)
+		shortLink := shorter.GetShortURL(ms.Cfg.Final.ShortURLAddr, v.ID)
 		savingData[i].ShortLink = shortLink
 		var toStore = memoryStorage.StorageItem{
 			Link:        savingData[i].Link,
@@ -154,7 +144,7 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 			ID:          savingData[i].ID,
 			DeletedFlag: savingData[i].DeletedFlag,
 		}
-		jsonData.Storage.Set(toStore)
+		ms.Storage.Set(toStore)
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})
 	}
 
@@ -167,15 +157,15 @@ func (jsonData *MemStorage) BatchSet() ([]byte, error) {
 	return JSONResp, nil
 }
 
-// JSONCutted - структура хранения входных/выходных данных для каждого УРЛ в пачке.
-type JSONCutted struct {
+// JSONCut - структура хранения входных/выходных данных для каждого УРЛ в пачке.
+type JSONCut struct {
 	Link      string `json:"original_url"`
 	ShortLink string `json:"short_url"`
 }
 
 // HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
 // Так же возвращает результат обработки запроса.
-func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
+func (ms *MemStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
 
 	errHandleUserUrls := ErrorMemory{
 		layer:          layer,
@@ -183,10 +173,10 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 		parentFuncName: `-`,
 	}
 
-	storage := jsonData.Storage.Get()
+	storage := ms.Storage.Get()
 	if len(storage) > 0 {
-		var resp JSONCutted
-		var batchResp []JSONCutted
+		var resp JSONCut
+		var batchResp []JSONCut
 		for _, v := range storage {
 			resp.Link = v.Link
 			resp.ShortLink = v.ShortLink
@@ -204,10 +194,10 @@ func (jsonData *MemStorage) HandleUserUrls() ([]byte, error) {
 
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
-func (jsonData *MemStorage) HandleUserUrlsDelete() {
+func (ms *MemStorage) HandleUserUrlsDelete(links string, userID int) {
 }
 
 // AsyncSaver - метод-демон, который работает асинхронно.
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
-func (jsonData *MemStorage) AsyncSaver() {
+func (ms *MemStorage) AsyncSaver() {
 }

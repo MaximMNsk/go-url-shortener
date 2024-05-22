@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS public.short_links
         original_url  TEXT  NOT NULL,
         short_url  TEXT  NOT NULL,
         uid  TEXT  NOT NULL,
-        user_id  TEXT  NULL,
+        user_id  INT  NULL,
         is_deleted BOOLEAN DEFAULT FALSE
     );
 
