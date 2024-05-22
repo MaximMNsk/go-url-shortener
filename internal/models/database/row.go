@@ -405,6 +405,7 @@ func ExplodeURLs(data string) ([]string, error) {
 	return result, nil
 }
 
+// BatchUpdate - устанавливает флаг "удалено" для переданных УРЛ.
 func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, userID int) error {
 
 	errBatchUpdate := ErrorDB{
