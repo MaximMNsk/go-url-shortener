@@ -2,9 +2,9 @@ package memorystorage
 
 // StorageItem - единица хранения УРЛ в памяти.
 type StorageItem struct {
-	Link        string
+	Link        string `json:"original_url"`
 	ShortLink   string
-	ID          string
+	ID          string `json:"correlation_id"`
 	DeletedFlag bool
 }
 

@@ -142,7 +142,7 @@ func (ms *MemStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 			Link:        savingData[i].Link,
 			ShortLink:   shortLink,
 			ID:          savingData[i].ID,
-			DeletedFlag: savingData[i].DeletedFlag,
+			DeletedFlag: false,
 		}
 		ms.Storage.Set(toStore)
 		outputData = append(outputData, outputBatch{ShortURL: shortLink, CorrelationID: v.ID})

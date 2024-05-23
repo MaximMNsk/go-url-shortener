@@ -36,7 +36,7 @@ type FileStorage struct {
 
 // Init - метод создает для каждого запроса объект.
 func (fs *FileStorage) Init() error {
-	err := MakeStorageFile(fs.Cfg.Final.LinkFile)
+	err := makeStorageFile(fs.Cfg.Final.LinkFile)
 	return err
 }
 
@@ -208,7 +208,7 @@ func saveData(data []byte, fileName string) error {
 }
 
 // MakeStorageFile - создает файл в файловой системе для хранения данных УРЛ.
-func MakeStorageFile(fileName string) error {
+func makeStorageFile(fileName string) error {
 
 	errMakeFile := ErrorFile{
 		layer:          layer,
@@ -247,10 +247,14 @@ func MakeStorageFile(fileName string) error {
 	return nil
 }
 
-type ioBatch struct {
+type inputBatch struct {
 	CorrelationID string `json:"correlation_id"`
 	OriginalLink  string `json:"original_url"`
 	ShortLink     string
+}
+type outputBatch struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortLink     string `json:"short_url"`
 }
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
@@ -267,8 +271,8 @@ func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, userID int) ([
 		parentFuncName: `-`,
 	}
 
-	var savingData []ioBatch
-	var outputData []ioBatch
+	var savingData []inputBatch
+	var outputData []outputBatch
 
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
@@ -282,10 +286,10 @@ func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, userID int) ([
 		savingData[i].CorrelationID = v.CorrelationID
 		savingData[i].ShortLink = shortLink
 
-		outputData = append(outputData, ioBatch{ShortLink: shortLink, CorrelationID: v.CorrelationID})
+		outputData = append(outputData, outputBatch{ShortLink: shortLink, CorrelationID: v.CorrelationID})
 	}
 
-	var savedData []ioBatch
+	var savedData []inputBatch
 
 	var jsonString string
 	jsonString, err = getData(fs.Cfg.Final.LinkFile)

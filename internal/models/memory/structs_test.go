@@ -145,3 +145,79 @@ func TestMemStorage_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorMemory_Error(t *testing.T) {
+	type args struct {
+		layer          string
+		parentFuncName string
+		funcName       string
+		message        string
+	}
+	type want struct {
+		message string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Error`,
+			args: args{
+				layer:          `db`,
+				parentFuncName: `some`,
+				funcName:       `this`,
+				message:        `word`,
+			},
+			want: want{
+				message: `[db](some/this): word`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ErrorMemory{
+				layer:          tt.args.layer,
+				funcName:       tt.args.funcName,
+				message:        tt.args.message,
+				parentFuncName: tt.args.parentFuncName,
+			}
+			msg := err.Error()
+			assert.Equal(t, tt.want.message, msg)
+		})
+	}
+}
+
+func TestMemStorage_BatchSet(t *testing.T) {
+	type args struct {
+		URLs string
+	}
+
+	type want struct {
+		res string
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Error`,
+			args: args{
+				URLs: `[{"correlation_id":"aaa","original_url":"111"},{"correlation_id":"bbb","original_url":"222"}]`,
+			},
+			want: want{res: `[{"correlation_id":"aaa","short_url":"http://localhost:8080/aaa"},{"correlation_id":"bbb","short_url":"http://localhost:8080/bbb"}]`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := Store.BatchSet(context.Background(), []byte(tt.args.URLs), 0)
+			require.NoError(t, err)
+			require.Equal(t, tt.want.res, string(res))
+		})
+	}
+}

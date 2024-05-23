@@ -30,9 +30,6 @@ type Storable interface {
 	// вторым - ошибку если есть.
 	BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error)
 
-	// BatchUpdate - изменяет статус на удаленный для записей
-	//BatchUpdate(ctx context.Context, links string, userID int) error
-
 	// HandleUserUrls - аналог BatchSet для конкретного пользователя.
 	HandleUserUrls(ctx context.Context, userID int) ([]byte, error)
 

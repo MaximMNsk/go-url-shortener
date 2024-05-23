@@ -380,7 +380,7 @@ func (dbs *DBStorage) AsyncSaver() {
 }
 
 // ExplodeURLs - функция для парсинга json-строки.
-func ExplodeURLs(data string) ([]string, error) {
+func explodeURLs(data string) ([]string, error) {
 
 	errExplodeURLs := ErrorDB{
 		layer:          layer,
@@ -414,7 +414,7 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, userID int)
 		parentFuncName: `AsyncSaver`,
 	}
 
-	data, err := ExplodeURLs(links)
+	data, err := explodeURLs(links)
 	if err != nil {
 		errBatchUpdate.message = `explode error`
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
