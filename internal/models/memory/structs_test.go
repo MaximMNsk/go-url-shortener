@@ -12,7 +12,7 @@ var Store MemStorage
 
 func TestMemStorage_Init(t *testing.T) {
 	type want struct {
-		MemErr ErrorMemory
+		MemErr MemoryError
 	}
 	tests := []struct {
 		name string
@@ -21,7 +21,7 @@ func TestMemStorage_Init(t *testing.T) {
 		{
 			name: `Test Init`,
 			want: want{
-				MemErr: ErrorMemory{
+				MemErr: MemoryError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `prepare`,
@@ -178,7 +178,7 @@ func TestErrorMemory_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ErrorMemory{
+			err := MemoryError{
 				layer:          tt.args.layer,
 				funcName:       tt.args.funcName,
 				message:        tt.args.message,

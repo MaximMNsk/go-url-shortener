@@ -12,7 +12,7 @@ func TestDBStorage_Init(t *testing.T) {
 
 	type want struct {
 		ToDelete chan DeleteItem
-		DBErr    ErrorDB
+		DBErr    DBError
 	}
 	tests := []struct {
 		name string
@@ -22,7 +22,7 @@ func TestDBStorage_Init(t *testing.T) {
 			name: `Test Init`,
 			want: want{
 				ToDelete: make(chan DeleteItem),
-				DBErr: ErrorDB{
+				DBErr: DBError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `prepare`,
@@ -119,7 +119,7 @@ func TestErrorDB_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ErrorDB{
+			err := DBError{
 				layer:          tt.args.layer,
 				funcName:       tt.args.funcName,
 				message:        tt.args.message,

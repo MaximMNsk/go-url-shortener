@@ -13,8 +13,8 @@ import (
 	"sync"
 )
 
-// ErrorFile - определение ошибки слоя файлового хранилища.
-type ErrorFile struct {
+// FileError - определение ошибки слоя файлового хранилища.
+type FileError struct {
 	layer          string
 	parentFuncName string
 	funcName       string
@@ -22,7 +22,7 @@ type ErrorFile struct {
 }
 
 // Error - заменяем стандартный вызов метода своим.
-func (e *ErrorFile) Error() string {
+func (e *FileError) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
@@ -63,7 +63,7 @@ type inputOutputData struct {
 func (fs *FileStorage) Get(ctx context.Context, shortLink string) (string, bool, error) {
 
 	var savedData []inputOutputData
-	getErr := ErrorFile{
+	getErr := FileError{
 		layer:          layer,
 		parentFuncName: `-`,
 		funcName:       `Get`,
@@ -94,7 +94,7 @@ func getData(fileName string) (string, error) {
 	mx.Lock()
 	defer mx.Unlock()
 
-	getDataErr := ErrorFile{
+	getDataErr := FileError{
 		layer:          layer,
 		parentFuncName: `Get`,
 		funcName:       `getData`,
@@ -131,12 +131,12 @@ func getData(fileName string) (string, error) {
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (fs *FileStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
+func (fs *FileStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, _ int) error {
 
 	var toSave []inputOutputData
 	var toLoad []inputOutputData
 
-	errSet := ErrorFile{
+	errSet := FileError{
 		layer:          layer,
 		parentFuncName: `-`,
 		funcName:       `Set`,
@@ -183,7 +183,7 @@ func saveData(data []byte, fileName string) error {
 	mx.Lock()
 	defer mx.Unlock()
 
-	errSaveData := ErrorFile{
+	errSaveData := FileError{
 		layer:          layer,
 		funcName:       `saveData`,
 		parentFuncName: `Set|BatchSet`,
@@ -210,7 +210,7 @@ func saveData(data []byte, fileName string) error {
 // MakeStorageFile - создает файл в файловой системе для хранения данных УРЛ.
 func makeStorageFile(fileName string) error {
 
-	errMakeFile := ErrorFile{
+	errMakeFile := FileError{
 		layer:          layer,
 		funcName:       `MakeStorageFile`,
 		parentFuncName: `ChooseStorage`,
@@ -259,13 +259,13 @@ type outputBatch struct {
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
+func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, _ int) ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
 
-	errBatchSet := ErrorFile{
+	errBatchSet := FileError{
 		layer:          layer,
 		funcName:       `BatchSet`,
 		parentFuncName: `-`,
@@ -334,10 +334,10 @@ type JSONCut struct {
 
 // HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
 // Так же возвращает результат обработки запроса.
-func (fs *FileStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
+func (fs *FileStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) {
 	var savedData []JSONCut
 
-	errHandleUserUrls := ErrorFile{
+	errHandleUserUrls := FileError{
 		layer:          layer,
 		funcName:       `BatchSet`,
 		parentFuncName: `-`,
@@ -369,7 +369,7 @@ func (fs *FileStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, 
 
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
-func (fs *FileStorage) HandleUserUrlsDelete(links string, userID int) {
+func (fs *FileStorage) HandleUserUrlsDelete(_ string, _ int) {
 }
 
 // AsyncSaver - метод-демон, который работает асинхронно.

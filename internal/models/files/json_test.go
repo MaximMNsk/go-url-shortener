@@ -13,7 +13,7 @@ var Store FileStorage
 
 func TestFileStorage_Init(t *testing.T) {
 	type want struct {
-		DBErr ErrorFile
+		DBErr FileError
 	}
 	tests := []struct {
 		name string
@@ -22,7 +22,7 @@ func TestFileStorage_Init(t *testing.T) {
 		{
 			name: `Test Init`,
 			want: want{
-				DBErr: ErrorFile{
+				DBErr: FileError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `prepare`,
@@ -194,7 +194,7 @@ func TestErrorFile_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ErrorFile{
+			err := FileError{
 				layer:          tt.args.layer,
 				funcName:       tt.args.funcName,
 				message:        tt.args.message,

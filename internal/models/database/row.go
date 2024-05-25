@@ -18,8 +18,8 @@ import (
 	"time"
 )
 
-// ErrorDB - определение ошибки слоя БД.
-type ErrorDB struct {
+// DBError - определение ошибки слоя БД.
+type DBError struct {
 	layer          string
 	parentFuncName string
 	funcName       string
@@ -27,7 +27,7 @@ type ErrorDB struct {
 }
 
 // Error - заменяем стандартный вызов метода своим.
-func (e *ErrorDB) Error() string {
+func (e *DBError) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
@@ -69,9 +69,6 @@ insert into public.short_links (original_url, short_url, uid, user_id) values ($
 const selectRow = `
 select original_url, is_deleted from public.short_links where (uid = $1 or original_url = $1)`
 
-const selectRowByUser = `
-select uid, original_url, short_url from public.short_links where (uid = $1 or original_url = $2) and user_id = $3`
-
 const selectAllRows = `
 select original_url, short_url from public.short_links where user_id = $1`
 
@@ -83,7 +80,7 @@ update public.short_links set is_deleted = true where uid = $1`
 
 func prepare(dsn string) error {
 
-	prepareErr := ErrorDB{
+	prepareErr := DBError{
 		layer:          layer,
 		parentFuncName: `-`,
 		funcName:       `prepare`,
@@ -113,7 +110,7 @@ func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 
 	err := dbs.ConnectionPool.Ping(ctx)
 	if err != nil {
-		pingErr := fmt.Errorf(`%w`, &ErrorDB{
+		pingErr := fmt.Errorf(`%w`, &DBError{
 			layer:          layer,
 			parentFuncName: `-`,
 			funcName:       `Ping`,
@@ -130,7 +127,7 @@ func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 // третий - ошибка выполнения.
 func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, error) {
 
-	getErr := ErrorDB{
+	getErr := DBError{
 		layer:          layer,
 		parentFuncName: `-`,
 		funcName:       `Get`,
@@ -171,7 +168,7 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 // Возвращает статус работы в виде ошибки.
 func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
 
-	errSet := ErrorDB{
+	errSet := DBError{
 		layer:          layer,
 		funcName:       `Set`,
 		parentFuncName: `-`,
@@ -210,21 +207,20 @@ type inputBatch struct {
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
 func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
 
-	var savingData []inputBatch
-	var outputData []outputBatch
-
-	errBatchSet := ErrorDB{
+	errBatchSet := DBError{
 		layer:          layer,
 		funcName:       `BatchSet`,
 		parentFuncName: `-`,
 	}
 
+	var savingData []inputBatch
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
 		errBatchSet.message = `unmarshal error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
+	outputData := make([]outputBatch, 0, len(savingData))
 	for i, v := range savingData {
 		shortLink := shorter.GetShortURL(dbs.Cfg.Final.ShortURLAddr, v.CorrelationID)
 
@@ -281,7 +277,7 @@ type JSONCutted struct {
 func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
 	var batchResp []JSONCutted
 
-	errHandleUserUrls := ErrorDB{
+	errHandleUserUrls := DBError{
 		layer:          layer,
 		funcName:       `HandleUserUrls`,
 		parentFuncName: `-`,
@@ -349,7 +345,7 @@ func (dbs *DBStorage) HandleUserUrlsDelete(links string, userID int) {
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (dbs *DBStorage) AsyncSaver() {
 
-	errHandleUserUrlsDelete := ErrorDB{
+	errHandleUserUrlsDelete := DBError{
 		layer:          layer,
 		funcName:       `AsyncSaver`,
 		parentFuncName: `-`,
@@ -382,7 +378,7 @@ func (dbs *DBStorage) AsyncSaver() {
 // ExplodeURLs - функция для парсинга json-строки.
 func explodeURLs(data string) ([]string, error) {
 
-	errExplodeURLs := ErrorDB{
+	errExplodeURLs := DBError{
 		layer:          layer,
 		funcName:       `explodeURLs`,
 		parentFuncName: `batchUpdate`,
@@ -406,9 +402,9 @@ func explodeURLs(data string) ([]string, error) {
 }
 
 // BatchUpdate - устанавливает флаг "удалено" для переданных УРЛ.
-func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, userID int) error {
+func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) error {
 
-	errBatchUpdate := ErrorDB{
+	errBatchUpdate := DBError{
 		layer:          layer,
 		funcName:       `errBatchUpdate`,
 		parentFuncName: `AsyncSaver`,

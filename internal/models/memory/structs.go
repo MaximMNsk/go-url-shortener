@@ -10,8 +10,8 @@ import (
 	"sync"
 )
 
-// ErrorMemory - определение ошибки слоя хранилища в памяти.
-type ErrorMemory struct {
+// MemoryError - определение ошибки слоя хранилища в памяти.
+type MemoryError struct {
 	layer          string
 	parentFuncName string
 	funcName       string
@@ -19,7 +19,7 @@ type ErrorMemory struct {
 }
 
 // Error - заменяем стандартный вызов метода своим.
-func (e *ErrorMemory) Error() string {
+func (e *MemoryError) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
@@ -42,7 +42,7 @@ func (ms *MemStorage) Destroy() {
 }
 
 // Ping - метод для проверки работоспособности хранилища.
-func (ms *MemStorage) Ping(ctx context.Context) (bool, error) {
+func (ms *MemStorage) Ping(_ context.Context) (bool, error) {
 	return true, nil
 }
 
@@ -50,7 +50,7 @@ func (ms *MemStorage) Ping(ctx context.Context) (bool, error) {
 // Первый возвращаемый параметр - сокращенный УРЛ,
 // второй - флаг присутствия,
 // третий - ошибка выполнения.
-func (ms *MemStorage) Get(ctx context.Context, shortLink string) (string, bool, error) {
+func (ms *MemStorage) Get(_ context.Context, shortLink string) (string, bool, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -58,7 +58,7 @@ func (ms *MemStorage) Get(ctx context.Context, shortLink string) (string, bool, 
 
 	storageData := ms.Storage.Get()
 
-	errGet := ErrorMemory{
+	errGet := MemoryError{
 		layer:          layer,
 		funcName:       `Get`,
 		parentFuncName: `-`,
@@ -80,7 +80,7 @@ func (ms *MemStorage) Get(ctx context.Context, shortLink string) (string, bool, 
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (ms *MemStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
+func (ms *MemStorage) Set(_ context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -114,13 +114,13 @@ type outputBatch struct {
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (ms *MemStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]byte, error) {
+func (ms *MemStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
 	defer mx.Unlock()
 
-	errBatchSet := ErrorMemory{
+	errBatchSet := MemoryError{
 		layer:          layer,
 		funcName:       `BatchSet`,
 		parentFuncName: `-`,
@@ -165,9 +165,9 @@ type JSONCut struct {
 
 // HandleUserUrls - возвращает слайс УРЛ, сохраненных текущим пользователем.
 // Так же возвращает результат обработки запроса.
-func (ms *MemStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
+func (ms *MemStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) {
 
-	errHandleUserUrls := ErrorMemory{
+	errHandleUserUrls := MemoryError{
 		layer:          layer,
 		funcName:       `HandleUserUrls`,
 		parentFuncName: `-`,
@@ -194,7 +194,7 @@ func (ms *MemStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, e
 
 // HandleUserUrlsDelete - удаляет переданные УРЛ текущего пользователя.
 // Отправляет данные в канал, из которого асинхронно вычитываются УРЛ и удаляются.
-func (ms *MemStorage) HandleUserUrlsDelete(links string, userID int) {
+func (ms *MemStorage) HandleUserUrlsDelete(_ string, _ int) {
 }
 
 // AsyncSaver - метод-демон, который работает асинхронно.

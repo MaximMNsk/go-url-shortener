@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
@@ -17,6 +18,8 @@ func main() {
 		logger.PrintLog(logger.INFO, "Config error", true)
 	}
 
+	ctx := context.Background()
+
 	var serv server.Server
 	serv.Init(conf, true)
 
@@ -27,19 +30,19 @@ func main() {
 			select {
 			case <-exit:
 				logger.PrintLog(logger.INFO, "Stopping server", serv.LogEnabled)
-				stopped := serv.Stop()
+				stopped := serv.Stop(ctx)
 				if stopped != nil {
 					logger.PrintLog(logger.INFO, "Do not stop server", serv.LogEnabled)
 				}
 				return
-			case <-time.After(1 * time.Second):
+			case <-time.After(100 * time.Millisecond):
 				continue
 			}
 		}
 	}()
 
 	logger.PrintLog(logger.INFO, `Start server`, serv.LogEnabled)
-	err = serv.Start()
+	err = serv.Start(ctx)
 	if err != nil {
 		logger.PrintLog(logger.ERROR, err.Error(), serv.LogEnabled)
 	}

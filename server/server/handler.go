@@ -404,10 +404,9 @@ func HandleOther(next http.Handler) http.Handler {
 		if req.Method == http.MethodGet || req.Method == http.MethodPost || req.Method == http.MethodDelete {
 			next.ServeHTTP(res, req)
 			return
-		} else {
-			httpResp.BadRequest(res)
-			return
 		}
+		httpResp.BadRequest(res)
+		return
 	})
 }
 
@@ -469,7 +468,6 @@ type Server struct {
 	Storage         model.Storable
 	Routers         chi.Router
 	Config          confModule.OuterConfig
-	Context         context.Context
 	HTTP            http.Server
 	LogEnabled      bool
 	ShutdownProcess bool
@@ -478,7 +476,7 @@ type Server struct {
 // NewServ - создает новый сервер для тестов.
 // Параметрами передаются конфигурация, модель сохранения, контекст для сервера.
 func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
-	return Server{Storage: s, Config: c, Context: ctx, ShutdownProcess: false}
+	return Server{Storage: s, Config: c, ShutdownProcess: false}
 }
 
 // Init - инициализирует сервер параметрами.
@@ -486,16 +484,15 @@ func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) {
 	s.Config = cfg
 	s.LogEnabled = needLogging
 	s.ShutdownProcess = false
-	s.Context = context.Background()
 }
 
 // Start - запускает сервер в работу.
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	if s.ShutdownProcess {
 		return nil
 	}
 
-	storage, err := ChooseStorage(s.Context, s.Config)
+	storage, err := ChooseStorage(ctx, s.Config)
 	if err != nil {
 		var serverHandlersErr *ErrorHandlers
 		if errors.As(err, &serverHandlersErr) {
@@ -549,10 +546,10 @@ func (s *Server) Start() error {
 }
 
 // Stop - останавливает сервер.
-func (s *Server) Stop() error {
+func (s *Server) Stop(ctx context.Context) error {
 	s.ShutdownProcess = true
 	s.Storage.Destroy()
-	err := s.HTTP.Shutdown(s.Context)
+	err := s.HTTP.Shutdown(ctx)
 	if err != nil {
 		return err
 	}
