@@ -14,12 +14,12 @@ import (
 )
 
 // HttpClient - структура объекта клиента
-type HttpClient struct {
+type HTTPClient struct {
 	host string
 }
 
 // MakeReq - выполняет http-запрос с указанными параметрами
-func (cl *HttpClient) MakeReq(method string, body io.Reader) (*http.Response, error) {
+func (cl *HTTPClient) MakeReq(method string, body io.Reader) (*http.Response, error) {
 	request, err := http.NewRequest(method, cl.host, body)
 	if err != nil {
 		fmt.Println(`Request error: `, err.Error())
@@ -59,7 +59,7 @@ func Example() {
 	}()
 
 	// Создаем клиент
-	client := &HttpClient{
+	client := &HTTPClient{
 		host: `http://localhost:8181/`,
 	}
 

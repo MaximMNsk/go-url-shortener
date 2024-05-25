@@ -406,7 +406,6 @@ func HandleOther(next http.Handler) http.Handler {
 			return
 		}
 		httpResp.BadRequest(res)
-		return
 	})
 }
 
