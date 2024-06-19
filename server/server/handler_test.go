@@ -3,12 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
-	model "github.com/MaximMNsk/go-url-shortener/internal/models/interface/models"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	random "github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/carlmjohnson/requests"
-	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -19,7 +17,6 @@ import (
 
 var Serv Server
 var Cfg config.OuterConfig
-var Storage model.Storable
 
 func TestErrorDB_Error(t *testing.T) {
 	type args struct {
@@ -75,7 +72,7 @@ func TestChooseStorage(t *testing.T) {
 		want want
 	}{
 		{
-			name: `Test NewServ`,
+			name: `Test ChooseStorage`,
 			args: args{},
 			want: want{},
 		},
@@ -87,16 +84,14 @@ func TestChooseStorage(t *testing.T) {
 			require.NoError(t, err)
 			err = Cfg.InitConfig(false)
 			require.NoError(t, err)
-			Storage, err = ChooseStorage(context.Background(), Cfg)
+			_, err = ChooseStorage(context.Background(), Cfg)
 			require.NoError(t, err)
 		})
 	}
 }
 
-func TestNewServ(t *testing.T) {
-	type args struct {
-		addr string
-	}
+func TestServer_Init(t *testing.T) {
+	type args struct{}
 	type want struct{}
 
 	tests := []struct {
@@ -105,29 +100,44 @@ func TestNewServ(t *testing.T) {
 		want want
 	}{
 		{
-			name: `Test NewServ`,
-			args: args{
-				addr: Cfg.Final.AppAddr,
-			},
+			name: `Test Init`,
+			args: args{},
 			want: want{},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			Serv = NewServ(Cfg, Storage, context.Background())
-			Serv.Routers = chi.NewRouter().With(HandleOther)
-			Serv.Routers.Route(`/`, func(r chi.Router) {
-				r.Get(`/ping`, Serv.HandlePing)
-				r.Get(`/`, Serv.HandleGET)
-				r.Post(`/`, Serv.HandlePOST)
-				r.Get(`/{query}`, Serv.HandleGET)
-			})
-			srv := http.Server{Addr: tt.args.addr, Handler: Serv.Routers}
+			err := Cfg.InitConfig(true)
+			require.NoError(t, err)
+			err = Serv.Init(Cfg, false)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestServer_Start(t *testing.T) {
+	type args struct{}
+	type want struct{}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Start`,
+			args: args{},
+			want: want{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			go func() {
-				_ = srv.ListenAndServe()
+				err := Serv.Start(context.Background())
+				require.NoError(t, err)
 			}()
-			time.Sleep(2 * time.Second)
 		})
 	}
 }
@@ -169,6 +179,7 @@ func TestHandleOther(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		time.Sleep(500 * time.Millisecond)
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, nil)
 			require.NoError(t, err)
@@ -182,14 +193,6 @@ func TestHandleOther(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-func ExampleHandleOther() {
-	request, _ := http.NewRequest(http.MethodPut, `http://localhost:8080/`, nil)
-	response, _ := http.DefaultClient.Do(request)
-	fmt.Println(response.StatusCode)
-	// Output: 400
-
-	_ = response.Body.Close()
 }
 
 func TestServer_HandlePing(t *testing.T) {
@@ -232,15 +235,6 @@ func TestServer_HandlePing(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func ExampleServer_HandlePing() {
-	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
-	response, _ := http.DefaultClient.Do(request)
-	fmt.Println(response.StatusCode)
-	// Output: 200
-
-	_ = response.Body.Close()
 }
 
 var Link string
@@ -288,16 +282,6 @@ func TestServer_HandlePOST(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func ExampleServer_HandlePOST() {
-	body := strings.NewReader(`ya.ru`)
-	request, _ := http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
-	response, _ := http.DefaultClient.Do(request)
-	fmt.Println(response.StatusCode)
-	// Output: 201
-
-	_ = response.Body.Close()
 }
 
 func TestServer_HandleGET(t *testing.T) {
@@ -350,22 +334,6 @@ func TestServer_HandleGET(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
-}
-
-func ExampleServer_HandleGET() {
-	shortLinkID := sha1hash.Create(`ya.ru`, 8)
-	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
-	client := http.DefaultClient
-	client.CheckRedirect = requests.NoFollow
-	response, _ := client.Do(request)
-
-	fmt.Println(response.StatusCode)
-	fmt.Println(response.Header.Get(`Location`))
-	// Output:
-	// 307
-	// ya.ru
-
-	_ = response.Body.Close()
 }
 
 func TestServer_HandlePOST_GET(t *testing.T) {
@@ -450,5 +418,105 @@ func TestServer_HandlePOST_GET(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestServer_Stop(t *testing.T) {
+	type args struct{}
+	type want struct{}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Stop`,
+			args: args{},
+			want: want{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			go func() {
+				// Дождемся выполнения запросов
+				time.Sleep(2000 * time.Millisecond)
+
+				err := Serv.Stop(context.Background())
+				require.NoError(t, err)
+			}()
+		})
+	}
+}
+
+func ExampleServer_Init() {
+	err := Serv.Init(Cfg, false)
+	if err != nil {
+		fmt.Printf("serv init err:%v\n", err)
+	}
+}
+
+func ExampleServer_Start() {
+	err := Serv.Start(context.Background())
+	if err != nil {
+		fmt.Printf("serv start err:%v\n", err)
+	}
+}
+
+func ExampleHandleOther() {
+	request, _ := http.NewRequest(http.MethodPut, `http://localhost:8080/`, nil)
+	response, err := http.DefaultClient.Do(request)
+	if err == nil {
+		fmt.Println(response.StatusCode)
+		_ = response.Body.Close()
+	}
+	// Output: 400
+}
+
+func ExampleServer_HandlePing() {
+	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
+	response, err := http.DefaultClient.Do(request)
+	if err == nil {
+		fmt.Println(response.StatusCode)
+		_ = response.Body.Close()
+	}
+	// Output: 200
+}
+
+func ExampleServer_HandlePOST() {
+	body := strings.NewReader(`ya.ru`)
+	request, _ := http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
+	response, err := http.DefaultClient.Do(request)
+	if err == nil {
+		fmt.Println(response.StatusCode)
+		_ = response.Body.Close()
+	}
+	// Output: 201
+}
+
+func ExampleServer_HandleGET() {
+	shortLinkID := sha1hash.Create(`ya.ru`, 8)
+	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	client := http.DefaultClient
+	client.CheckRedirect = requests.NoFollow
+	response, err := client.Do(request)
+
+	if err == nil {
+		fmt.Println(response.StatusCode)
+		fmt.Println(response.Header.Get(`Location`))
+		_ = response.Body.Close()
+	}
+
+	// Output:
+	// 307
+	// ya.ru
+}
+
+func ExampleServer_Stop() {
+	err := Serv.Stop(context.Background())
+	if err != nil {
+		fmt.Printf("serv stop err:%v\n", err)
 	}
 }

@@ -38,13 +38,24 @@ func BenchmarkGetShortURL(b *testing.B) {
 		addr   string
 		linkID string
 	}
-	b.Run(`GetShortURL`, func(b *testing.B) {
-		args := args{
-			addr:   Cfg.Final.AppAddr,
-			linkID: random.StringBytes(10),
-		}
-		for i := 0; i < count; i++ {
-			_ = GetShortURL(args.addr, args.linkID)
-		}
-	})
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "BenchmarkGetShortURL",
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				linkID: random.StringBytes(10),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(`GetShortURL`, func(b *testing.B) {
+			for i := 0; i < count; i++ {
+				_ = GetShortURL(tt.args.addr, tt.args.linkID)
+			}
+		})
+	}
 }

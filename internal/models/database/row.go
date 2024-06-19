@@ -248,7 +248,15 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 		batch.Queue(insertLinkRowBatch, v.OriginalLink, v.ShortLink, v.CorrelationID, userID)
 	}
 	br := acquire.SendBatch(ctx, &batch)
-	defer br.Close()
+	defer func(br pgx.BatchResults) {
+		err = br.Close()
+	}(br)
+
+	if err != nil {
+		errBatchSet.message = "cannot close batch"
+		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
+	}
+
 	_, errPg := br.Exec()
 
 	JSONResp, err := json.Marshal(outputData)
@@ -429,7 +437,15 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) erro
 	}
 
 	br := acquire.SendBatch(ctx, &batch)
-	defer br.Close()
+	defer func(br pgx.BatchResults) {
+		err = br.Close()
+	}(br)
+
+	if err != nil {
+		errBatchUpdate.message = "cannot close batch"
+		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
+	}
+
 	_, err = br.Exec()
 
 	if err != nil {

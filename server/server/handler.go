@@ -102,7 +102,6 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 	}
 
 	contentBody, errBody := io.ReadAll(req.Body)
-	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
@@ -144,6 +143,14 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 		httpResp.BadRequest(res)
 		return
 	}
+
+	err := req.Body.Close()
+	if err != nil {
+		logger.PrintLog(logger.ERROR, "Body close: "+err.Error(), s.LogEnabled)
+		httpResp.BadRequest(res)
+		return
+	}
+
 	// Отдаем 201 ответ с шортлинком.
 	httpResp.Created(res, additional)
 }
@@ -204,12 +211,17 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrlsDelete`, s.LogEnabled)
 
 	contentBody, errBody := io.ReadAll(req.Body)
-	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
 	}
 	httpResp.Accepted(res, httpResp.Additional{})
+
+	err := req.Body.Close()
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
 
 	userID := req.Context().Value(cookie.UserNum(`UserID`))
 	s.Storage.HandleUserUrlsDelete(string(contentBody), userID.(int))
@@ -277,7 +289,6 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 	logger.PrintLog(logger.DEBUG, `HandleAPIBatch`, s.LogEnabled)
 
 	contentBody, errBody := io.ReadAll(req.Body)
-	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
@@ -305,6 +316,12 @@ func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
 		}
 	}
 
+	err = req.Body.Close()
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	httpResp.CreatedJSON(res, additional)
 }
 
@@ -325,7 +342,6 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 	logger.PrintLog(logger.DEBUG, `HandleAPIShorten`, s.LogEnabled)
 
 	contentBody, errBody := io.ReadAll(req.Body)
-	defer req.Body.Close()
 	if errBody != nil {
 		httpResp.BadRequest(res)
 		return
@@ -370,6 +386,13 @@ func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
 			return
 		}
 	}
+
+	err = req.Body.Close()
+	if err != nil {
+		httpResp.BadRequest(res)
+		return
+	}
+
 	// Отдаем 201 ответ с шортлинком
 	httpResp.CreatedJSON(res, additional)
 }
@@ -420,12 +443,12 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 	}
 
 	var storage model.Storable
+
 	if conf.Env.DB != "" || conf.Flag.DB != "" {
 		pgPool, err := db.Connect(ctx, conf)
 		if err != nil {
 			return nil, err
 		}
-
 		storage = &database.DBStorage{
 			ConnectionPool: pgPool,
 			Cfg:            conf,
@@ -439,8 +462,8 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 		go storage.AsyncSaver()
 		return storage, nil
 	}
-	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
 
+	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
 		storage = &files.FileStorage{
 			Cfg: conf,
 		}
@@ -451,6 +474,7 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 		}
 		return storage, nil
 	}
+
 	storage = &memory.MemStorage{
 		Storage: memoryStorage.Storage{},
 	}
@@ -472,17 +496,22 @@ type Server struct {
 	ShutdownProcess bool
 }
 
-// NewServ - создает новый сервер для тестов.
-// Параметрами передаются конфигурация, модель сохранения, контекст для сервера.
-func NewServ(c confModule.OuterConfig, s model.Storable, ctx context.Context) Server {
-	return Server{Storage: s, Config: c, ShutdownProcess: false}
-}
-
 // Init - инициализирует сервер параметрами.
-func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) {
+func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) error {
+	handleInitErr := &ErrorHandlers{
+		layer:          `Handlers`,
+		funcName:       `Init`,
+		parentFuncName: `-`,
+	}
+
+	var emptyCfg = confModule.OuterConfig{}
+	if cfg == emptyCfg {
+		return handleInitErr
+	}
 	s.Config = cfg
 	s.LogEnabled = needLogging
 	s.ShutdownProcess = false
+	return nil
 }
 
 // Start - запускает сервер в работу.

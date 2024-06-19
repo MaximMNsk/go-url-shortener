@@ -50,7 +50,10 @@ func Example() {
 
 	// Запускаем сервер.
 	var serv server.Server
-	serv.Init(conf, false)
+	err = serv.Init(conf, false)
+	if err != nil {
+		fmt.Println(`Server init error: `, err.Error())
+	}
 	go func() {
 		err = serv.Start(ctx)
 		if err != nil {

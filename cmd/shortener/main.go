@@ -16,12 +16,17 @@ func main() {
 	err := conf.InitConfig(false)
 	if err != nil {
 		logger.PrintLog(logger.INFO, "Config error", true)
+		return
 	}
 
 	ctx := context.Background()
 
 	var serv server.Server
-	serv.Init(conf, true)
+	err = serv.Init(conf, true)
+	if err != nil {
+		logger.PrintLog(logger.INFO, "Server init error", true)
+		return
+	}
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGABRT, syscall.SIGINT, syscall.SIGSEGV)

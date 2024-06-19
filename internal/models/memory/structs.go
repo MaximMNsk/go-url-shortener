@@ -80,7 +80,7 @@ func (ms *MemStorage) Get(_ context.Context, shortLink string) (string, bool, er
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (ms *MemStorage) Set(_ context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
+func (ms *MemStorage) Set(_ context.Context, originalLink string, shortLink string, hashLink string, _ int) error {
 
 	var mx sync.Mutex
 	mx.Lock()

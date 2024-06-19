@@ -108,7 +108,6 @@ func getData(fileName string) (string, error) {
 		getDataErr.message = err.Error()
 		return "[]", nil
 	}
-	defer f.Close()
 
 	for {
 		n, errRead := f.Read(data)
@@ -124,6 +123,11 @@ func getData(fileName string) (string, error) {
 
 	if result == "" {
 		return "[]", nil
+	}
+
+	err = f.Close()
+	if err != nil {
+		return "", err
 	}
 
 	return result, nil

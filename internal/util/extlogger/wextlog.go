@@ -81,7 +81,6 @@ func Log(h http.Handler) http.Handler {
 		}
 
 		body, _ := io.ReadAll(r.Body)
-		defer r.Body.Close()
 
 		var UserID cookie.UserNum
 		token, err := r.Cookie("token")
@@ -102,6 +101,11 @@ func Log(h http.Handler) http.Handler {
 			Int("Status", responseData.status).
 			Int("Size", responseData.size).
 			Send()
+
+		err = r.Body.Close()
+		if err != nil {
+			return
+		}
 	}
 	return http.HandlerFunc(logFn)
 }
