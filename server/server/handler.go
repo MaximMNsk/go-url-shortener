@@ -250,12 +250,20 @@ func (s *Server) HandleAPIBatch(res http.ResponseWriter, req *http.Request) {
 		httpResp.BadRequest(res)
 		return
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			httpResp.BadRequest(res)
+			return
+		}
+	}(req.Body)
 
 	logger.PrintLog(logger.DEBUG, `Body: `+string(contentBody), s.LogEnabled)
 
 	userID := req.Context().Value(cookie.UserNum(`UserID`))
 
 	resData, err := s.Storage.BatchSet(req.Context(), contentBody, userID.(int))
+
 	additional := httpResp.Additional{
 		Place:     "body",
 		InnerData: string(resData),
@@ -271,12 +279,6 @@ func (s *Server) HandleAPIBatch(res http.ResponseWriter, req *http.Request) {
 			httpResp.BadRequest(res)
 			return
 		}
-	}
-
-	err = req.Body.Close()
-	if err != nil {
-		httpResp.BadRequest(res)
-		return
 	}
 
 	httpResp.CreatedJSON(res, additional)
@@ -433,6 +435,7 @@ func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Stor
 
 	storage = &memory.MemStorage{
 		Storage: memoryStorage.Storage{},
+		Cfg:     conf,
 	}
 	err := storage.Init()
 	if err != nil {
