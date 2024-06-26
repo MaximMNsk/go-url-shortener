@@ -10,8 +10,8 @@ import (
 	"sync"
 )
 
-// MemoryError - определение ошибки слоя хранилища в памяти.
-type MemoryError struct {
+// MemError - определение ошибки слоя хранилища в памяти.
+type MemError struct {
 	layer          string
 	parentFuncName string
 	funcName       string
@@ -19,7 +19,7 @@ type MemoryError struct {
 }
 
 // Error - заменяем стандартный вызов метода своим.
-func (e *MemoryError) Error() string {
+func (e *MemError) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
@@ -27,12 +27,15 @@ const layer = `Memory`
 
 // MemStorage - основная структура хранения.
 type MemStorage struct {
-	Storage memoryStorage.Storage
-	Cfg     confModule.OuterConfig
+	AsyncSaverStatCh chan MemError
+	Storage          memoryStorage.Storage
+	Cfg              confModule.OuterConfig
 }
 
 // Init - метод создает для каждого запроса объект.
 func (ms *MemStorage) Init() error {
+	ms.AsyncSaverStatCh = make(chan MemError)
+	ms.Storage.Init()
 	return nil
 }
 
@@ -58,7 +61,7 @@ func (ms *MemStorage) Get(_ context.Context, shortLink string) (string, bool, er
 
 	storageData := ms.Storage.Get()
 
-	errGet := MemoryError{
+	errGet := MemError{
 		layer:          layer,
 		funcName:       `Get`,
 		parentFuncName: `-`,
@@ -120,7 +123,7 @@ func (ms *MemStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, e
 	mx.Lock()
 	defer mx.Unlock()
 
-	errBatchSet := MemoryError{
+	errBatchSet := MemError{
 		layer:          layer,
 		funcName:       `BatchSet`,
 		parentFuncName: `-`,
@@ -167,7 +170,7 @@ type JSONCut struct {
 // Так же возвращает результат обработки запроса.
 func (ms *MemStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) {
 
-	errHandleUserUrls := MemoryError{
+	errHandleUserUrls := MemError{
 		layer:          layer,
 		funcName:       `HandleUserUrls`,
 		parentFuncName: `-`,
@@ -200,4 +203,13 @@ func (ms *MemStorage) HandleUserUrlsDelete(_ string, _ int) {
 // AsyncSaver - метод-демон, который работает асинхронно.
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (ms *MemStorage) AsyncSaver() {
+	if !ms.Storage.Enabled() {
+		errAsyncSaver := MemError{
+			layer:          layer,
+			funcName:       `AsyncSaver`,
+			parentFuncName: `-`,
+			message:        `storage is disabled`,
+		}
+		ms.AsyncSaverStatCh <- errAsyncSaver
+	}
 }

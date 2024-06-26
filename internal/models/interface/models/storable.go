@@ -7,7 +7,8 @@ import (
 
 // Storable - интерфейс для создания
 // новых хранилищ.
-// go:generate go run github.com/vektra/mockery/v2@v2.43.0 --name=Storable
+//
+//go:generate go run github.com/vektra/mockery/v2@v2.43.0 --name=Storable
 type Storable interface {
 
 	// Init - метод Инициализации хранилища.

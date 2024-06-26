@@ -155,49 +155,6 @@ func (s *Server) HandlePOST(res http.ResponseWriter, req *http.Request) {
 	httpResp.Created(res, additional)
 }
 
-type controllers map[string]bool
-
-// HandleAPI - принимает и маршрутизирует API запросы.
-// В зависимости от контроллера запроса и метода вызывает соответствующую функцию обработки.
-func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
-
-	if s.ShutdownProcess {
-		httpResp.Shutdown(res)
-		return
-	}
-
-	ctrl := chi.URLParam(req, "query")
-
-	availableCurls := make(controllers, 3)
-	availableCurls["shorten"] = true
-	availableCurls["batch"] = true
-	availableCurls["urls"] = true
-
-	if !availableCurls[ctrl] {
-		httpResp.BadRequest(res)
-		return
-	}
-
-	if ctrl == "shorten" {
-		HandleAPIShorten(res, req, s)
-		return
-	}
-
-	if ctrl == "batch" {
-		HandleAPIBatch(res, req, s)
-		return
-	}
-
-	if ctrl == `urls` && req.Method == `GET` {
-		HandleAPIUserUrls(res, req, s)
-		return
-	}
-	if ctrl == `urls` && req.Method == `DELETE` {
-		HandleAPIUserUrlsDelete(res, req, s)
-		return
-	}
-}
-
 // HandleAPIUserUrlsDelete - функция метода HandleAPI, агрегирующая логику удаления пакета URL через API.
 // Работает для конкретного пользователя.
 // хендлер DELETE /api/user/urls в теле запроса принимает список идентификаторов сокращённых URL
@@ -206,7 +163,7 @@ func (s *Server) HandleAPI(res http.ResponseWriter, req *http.Request) {
 // Content-Type: application/json
 //
 // ["6qxTVvsy", "RTfd56hn", "Jlfd67ds"]
-func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Server) {
+func (s *Server) HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request) {
 
 	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrlsDelete`, s.LogEnabled)
 
@@ -229,7 +186,7 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 
 // HandleAPIUserUrls - функция метода HandleAPI, агрегирующая логику обработки пакета URL через API.
 // Работает для конкретного пользователя.
-// хендлер GET /api/user/urls может вернуть пользователю все когда-либо сокращённые им URL в формате:
+// Хендлер GET /api/user/urls может вернуть пользователю все когда-либо сокращённые им URL в формате:
 // [
 //
 //	{
@@ -239,7 +196,7 @@ func HandleAPIUserUrlsDelete(res http.ResponseWriter, req *http.Request, s *Serv
 //	...
 //
 // ]
-func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
+func (s *Server) HandleAPIUserUrls(res http.ResponseWriter, req *http.Request) {
 
 	logger.PrintLog(logger.DEBUG, `HandleAPIUserUrls`, s.LogEnabled)
 
@@ -284,7 +241,7 @@ func HandleAPIUserUrls(res http.ResponseWriter, req *http.Request, s *Server) {
 //	...
 //
 // ]
-func HandleAPIBatch(res http.ResponseWriter, req *http.Request, s *Server) {
+func (s *Server) HandleAPIBatch(res http.ResponseWriter, req *http.Request) {
 
 	logger.PrintLog(logger.DEBUG, `HandleAPIBatch`, s.LogEnabled)
 
@@ -337,7 +294,7 @@ type output struct {
 // Эндпоинт POST /api/shorten будет принимать в теле запроса JSON-объект {"url":"<some_url>"}
 // и возвращать в ответ объект {"result":"<short_url>"}.
 // Content-Type: application/json
-func HandleAPIShorten(res http.ResponseWriter, req *http.Request, s *Server) {
+func (s *Server) HandleAPIShorten(res http.ResponseWriter, req *http.Request) {
 
 	logger.PrintLog(logger.DEBUG, `HandleAPIShorten`, s.LogEnabled)
 
@@ -417,7 +374,6 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	}
 	if err != nil {
 		logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error(), s.LogEnabled)
-		httpResp.InternalError(res)
 	}
 }
 
@@ -547,16 +503,16 @@ func (s *Server) Start(ctx context.Context) error {
 			r.Use(cookie.AuthSetter)
 
 			r.Post(`/`, s.HandlePOST)
-			r.Post(`/api/{query}`, s.HandleAPI)
-			r.Post(`/api/shorten/{query}`, s.HandleAPI)
+			r.Post(`/api/{query}`, s.HandleAPIBatch)
+			r.Post(`/api/shorten/{query}`, s.HandleAPIShorten)
 			r.Get(`/ping`, s.HandlePing)
 			r.Get(`/{query}`, s.HandleGET)
 		})
 		s.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)
 
-			r.Delete(`/api/user/{query}`, s.HandleAPI)
-			r.Get(`/api/user/{query}`, s.HandleAPI)
+			r.Delete(`/api/user/{query}`, s.HandleAPIUserUrlsDelete)
+			r.Get(`/api/user/{query}`, s.HandleAPIUserUrls)
 		})
 	})
 

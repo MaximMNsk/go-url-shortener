@@ -6,13 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 var Store MemStorage
 
 func TestMemStorage_Init(t *testing.T) {
 	type want struct {
-		MemErr MemoryError
+		MemErr MemError
 	}
 	tests := []struct {
 		name string
@@ -21,7 +22,7 @@ func TestMemStorage_Init(t *testing.T) {
 		{
 			name: `Test Init`,
 			want: want{
-				MemErr: MemoryError{
+				MemErr: MemError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `prepare`,
@@ -92,7 +93,7 @@ func TestMemStorage_Set(t *testing.T) {
 			name: "Set",
 			args: args{
 				link:      `aaa`,
-				shortLink: `http://localhost:8080:bbb`,
+				shortLink: `http://localhost:8080/bbb`,
 				hashLink:  `bbb`,
 			},
 		},
@@ -131,7 +132,7 @@ func TestMemStorage_Get(t *testing.T) {
 			},
 			want: want{
 				link:      `aaa`,
-				shortLink: `http://localhost:8080:bbb`,
+				shortLink: `http://localhost:8080/bbb`,
 			},
 		},
 	}
@@ -178,7 +179,7 @@ func TestErrorMemory_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := MemoryError{
+			err := MemError{
 				layer:          tt.args.layer,
 				funcName:       tt.args.funcName,
 				message:        tt.args.message,
@@ -220,4 +221,75 @@ func TestMemStorage_BatchSet(t *testing.T) {
 			require.Equal(t, tt.want.res, string(res))
 		})
 	}
+}
+
+func TestMemStorage_HandleUserUrls(t *testing.T) {
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
+
+	type args struct {
+		link      string
+		shortLink string
+		hashLink  string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "HandleUserUrls",
+			args: args{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, errCfg)
+
+			_, err := Store.HandleUserUrls(nil, 0)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestMemStorage_HandleUserUrlsDelete(t *testing.T) {
+	type args struct {
+		link      string
+		shortLink string
+		hashLink  string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "HandleUserUrlsDelete",
+			args: args{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg config.OuterConfig
+			errCfg := cfg.InitConfig(true)
+			require.NoError(t, errCfg)
+
+			Store.HandleUserUrlsDelete(``, 0)
+		})
+	}
+}
+
+func TestMemStorage_AsyncSaver(t *testing.T) {
+	go func() {
+		Store.AsyncSaver()
+	}()
+
+	select {
+	case <-time.After(time.Millisecond * 100):
+	case dataErr, ok := <-Store.AsyncSaverStatCh:
+		require.NoError(t, &dataErr)
+		require.True(t, ok)
+	}
+}
+
+func TestMemStorage_Destroy(t *testing.T) {
+	Store.Destroy()
 }

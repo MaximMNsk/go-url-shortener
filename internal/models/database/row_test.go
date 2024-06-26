@@ -1,12 +1,16 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
+
+var Store DBStorage
 
 func TestDBStorage_Init(t *testing.T) {
 
@@ -37,12 +41,14 @@ func TestDBStorage_Init(t *testing.T) {
 			var cfg config.OuterConfig
 			ConfErr := cfg.InitConfig(true)
 			require.NoError(t, ConfErr)
-			var Store = DBStorage{
-				Cfg: cfg,
-			}
+			Store.Cfg = cfg
+			//Store.ConnectionPool, _ = pgxmock.NewPool()
 
 			err := Store.Init()
 			require.Error(t, err, tt.want.DBErr.Error())
+			if err != nil {
+				t.Skip(`connection refused`)
+			}
 		})
 	}
 }
@@ -129,4 +135,129 @@ func TestErrorDB_Error(t *testing.T) {
 			assert.Equal(t, tt.want.message, msg)
 		})
 	}
+}
+
+func TestDBStorage_Ping(t *testing.T) {
+	type want struct {
+		ToDelete chan DeleteItem
+		DBErr    DBError
+	}
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: `Test Ping`,
+			want: want{
+				ToDelete: make(chan DeleteItem),
+				DBErr: DBError{
+					layer:          layer,
+					parentFuncName: ``,
+					funcName:       `Ping`,
+					message:        `Connection pool is nil`,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ping, err := Store.Ping(context.Background())
+			require.Equal(t, false, ping)
+			require.Error(t, err, tt.want.DBErr)
+			if err != nil {
+				t.Skip(`connection refused`)
+			}
+		})
+	}
+}
+
+func TestDBStorage_Set(t *testing.T) {
+	type want struct {
+		ToDelete chan DeleteItem
+		DBErr    DBError
+	}
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: `Test Set`,
+			want: want{
+				ToDelete: make(chan DeleteItem),
+				DBErr: DBError{
+					layer:          layer,
+					parentFuncName: ``,
+					funcName:       `Set`,
+					message:        `Connection pool is nil`,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Store.Set(context.Background(), ``, ``, ``, 0)
+			require.Error(t, err, tt.want.DBErr)
+		})
+	}
+}
+
+func TestDBStorage_Get(t *testing.T) {
+	type want struct {
+		ToDelete  chan DeleteItem
+		DBErr     DBError
+		data      string
+		isDeleted bool
+	}
+	type args struct {
+		link string
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Get`,
+			args: args{link: `asdasd`},
+			want: want{
+				ToDelete: make(chan DeleteItem),
+				DBErr: DBError{
+					layer:          layer,
+					parentFuncName: ``,
+					funcName:       `Get`,
+					message:        `Connection pool is nil`,
+				},
+				data:      ``,
+				isDeleted: false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, isDeleted, err := Store.Get(context.Background(), tt.args.link)
+			require.Error(t, err, tt.want.DBErr)
+			require.Equal(t, data, tt.want.data)
+			require.Equal(t, isDeleted, tt.want.isDeleted)
+		})
+	}
+}
+
+func TestDBStorage_AsyncSaver(t *testing.T) {
+	go func() {
+		Store.AsyncSaver()
+	}()
+
+	select {
+	case <-time.After(time.Millisecond * 100):
+	case dataErr, ok := <-Store.AsyncSaverStatCh:
+		require.Error(t, &dataErr)
+		require.True(t, ok)
+	}
+}
+
+func TestDBStorage_Destroy(t *testing.T) {
+	Store.Destroy()
 }

@@ -31,17 +31,27 @@ const layer = `File`
 
 // FileStorage - основная структура хранения.
 type FileStorage struct {
-	Cfg confModule.OuterConfig
+	AsyncSaverStatCh chan FileError
+	Cfg              confModule.OuterConfig
+	StorageExists    bool
 }
 
 // Init - метод создает для каждого запроса объект.
 func (fs *FileStorage) Init() error {
+	fs.AsyncSaverStatCh = make(chan FileError)
 	err := makeStorageFile(fs.Cfg.Final.LinkFile)
+	if err == nil {
+		fs.StorageExists = true
+	}
 	return err
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
 func (fs *FileStorage) Destroy() {
+	if fs.AsyncSaverStatCh != nil {
+		close(fs.AsyncSaverStatCh)
+	}
+	fs.StorageExists = false
 }
 
 // Ping - метод для проверки работоспособности хранилища.
@@ -379,4 +389,13 @@ func (fs *FileStorage) HandleUserUrlsDelete(_ string, _ int) {
 // AsyncSaver - метод-демон, который работает асинхронно.
 // Слушает канал, в который передаются УРЛ для удаления и обрабатывает их.
 func (fs *FileStorage) AsyncSaver() {
+	if !fs.StorageExists {
+		errAsyncSaver := FileError{
+			layer:          layer,
+			funcName:       `AsyncSaver`,
+			parentFuncName: `-`,
+			message:        `storage not exist`,
+		}
+		fs.AsyncSaverStatCh <- errAsyncSaver
+	}
 }

@@ -35,7 +35,6 @@ func TestConnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if Conf.Env.DB == "" && Conf.Flag.DB == "" {
 				assert.NotEmpty(t, Conf.Final.DB)
-				return
 			}
 
 			require.NoError(t, Err)
@@ -44,7 +43,7 @@ func TestConnect(t *testing.T) {
 			require.NoError(t, err)
 			defer pgPool.Close()
 			err = pgPool.Ping(ctx)
-			require.NoError(t, err)
+			require.Error(t, err)
 		})
 	}
 

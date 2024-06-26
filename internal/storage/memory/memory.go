@@ -10,12 +10,14 @@ type StorageItem struct {
 
 // Storage - хранилище в памяти.
 type Storage struct {
-	data []StorageItem
+	data    []StorageItem
+	enabled bool
 }
 
 // Init - создает пустое хранилище.
 func (s *Storage) Init() {
 	s.data = make([]StorageItem, 0)
+	s.enabled = true
 }
 
 // Set - записывает единицу хранения в память.
@@ -31,4 +33,9 @@ func (s *Storage) Get() []StorageItem {
 // Clear - делает пустым хранилище.
 func (s *Storage) Clear() {
 	s.data = make([]StorageItem, 0)
+}
+
+// Enabled - возвращает статус хранилища
+func (s *Storage) Enabled() bool {
+	return s.enabled
 }

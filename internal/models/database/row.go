@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/golang-migrate/migrate/v4"
@@ -41,22 +39,31 @@ const layer = `DB`
 // ConnectionPool - пул, из которого выбирается соединение для работы с хранилищем.
 // Cfg - конфигурация, которая инициализируется при запуске.
 type DBStorage struct {
-	ToDeleteCh     chan DeleteItem
-	ConnectionPool *pgxpool.Pool
-	Cfg            confModule.OuterConfig
+	ToDeleteCh       chan DeleteItem
+	AsyncSaverStatCh chan DBError
+	ConnectionPool   *pgxpool.Pool
+	Cfg              confModule.OuterConfig
 }
 
 // Init - метод создает для каждого запроса объект.
 func (dbs *DBStorage) Init() error {
 	dbs.ToDeleteCh = make(chan DeleteItem)
+	dbs.AsyncSaverStatCh = make(chan DBError)
 	err := prepare(dbs.Cfg.Final.DB)
 	return err
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
 func (dbs *DBStorage) Destroy() {
-	close(dbs.ToDeleteCh)
-	db.Close(dbs.ConnectionPool)
+	if dbs.ToDeleteCh != nil {
+		close(dbs.ToDeleteCh)
+	}
+	if dbs.AsyncSaverStatCh != nil {
+		close(dbs.AsyncSaverStatCh)
+	}
+	if dbs.ConnectionPool != nil {
+		dbs.ConnectionPool.Close()
+	}
 }
 
 const insertLinkRow = `
@@ -108,6 +115,15 @@ func prepare(dsn string) error {
 // Ping - прикладной метод для проверки работоспособности хранилища.
 func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 
+	if dbs.ConnectionPool == nil {
+		return false, fmt.Errorf(`%w`, &DBError{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `Ping`,
+			message:        `Connection pool is nil`,
+		})
+	}
+
 	err := dbs.ConnectionPool.Ping(ctx)
 	if err != nil {
 		pingErr := fmt.Errorf(`%w`, &DBError{
@@ -127,6 +143,14 @@ func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 // третий - ошибка выполнения.
 func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, error) {
 
+	if dbs.ConnectionPool == nil {
+		return ``, false, fmt.Errorf(`%w`, &DBError{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `Get`,
+			message:        `Connection pool is nil`,
+		})
+	}
 	getErr := DBError{
 		layer:          layer,
 		parentFuncName: `-`,
@@ -167,6 +191,15 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
 func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, userID int) error {
+
+	if dbs.ConnectionPool == nil {
+		return fmt.Errorf(`%w`, &DBError{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `Set`,
+			message:        `Connection pool is nil`,
+		})
+	}
 
 	errSet := DBError{
 		layer:          layer,
@@ -359,6 +392,11 @@ func (dbs *DBStorage) AsyncSaver() {
 		parentFuncName: `-`,
 	}
 
+	if dbs.ConnectionPool == nil {
+		errHandleUserUrlsDelete.message = "connection to DB not found"
+		dbs.AsyncSaverStatCh <- errHandleUserUrlsDelete
+	}
+
 	for {
 		if dbs.ToDeleteCh == nil {
 			time.Sleep(100 * time.Millisecond)
@@ -368,13 +406,13 @@ func (dbs *DBStorage) AsyncSaver() {
 		case data, ok := <-dbs.ToDeleteCh:
 			if !ok {
 				errHandleUserUrlsDelete.message = `channel reading error`
-				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error(), true)
+				dbs.AsyncSaverStatCh <- errHandleUserUrlsDelete
 				continue
 			}
 			err := dbs.BatchUpdate(context.Background(), data.URLs, data.UserID)
 			if err != nil {
 				errHandleUserUrlsDelete.message = `update error`
-				logger.PrintLog(logger.WARN, errHandleUserUrlsDelete.Error()+` `+err.Error(), true)
+				dbs.AsyncSaverStatCh <- errHandleUserUrlsDelete
 				continue
 			}
 		default:

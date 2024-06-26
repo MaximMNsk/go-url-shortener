@@ -13,11 +13,11 @@ import (
 )
 
 // Header
-//type Header http.Header
+type Header http.Header
 
 // ResponseWriter - интерфейс, который определяет структуру пакета.
 type ResponseWriter interface {
-	//Header() Header
+	Header() Header
 	Write([]byte) (int, error)
 	WriteHeader(statusCode int)
 }

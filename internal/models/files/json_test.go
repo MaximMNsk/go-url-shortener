@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 var Store FileStorage
@@ -96,7 +97,7 @@ func TestFileStorage_Set(t *testing.T) {
 			args: args{
 				fileName:  filepath.Join(cfg.Default.LinkFile),
 				link:      `aaa`,
-				shortLink: `http://localhost:8080:bbb`,
+				shortLink: `http://localhost:8080/bbb`,
 				hashLink:  `bbb`,
 			},
 		},
@@ -106,7 +107,6 @@ func TestFileStorage_Set(t *testing.T) {
 			require.NoError(t, errCfg)
 
 			Store.Cfg = cfg
-			//file.Cfg.Final.LinkFile = cfg.Default.LinkFile
 			err := Store.Init()
 			require.NoError(t, err)
 
@@ -143,7 +143,7 @@ func TestFileStorage_Get(t *testing.T) {
 			},
 			want: want{
 				link:      `aaa`,
-				shortLink: `http://localhost:8080:bbb`,
+				shortLink: `http://localhost:8080/bbb`,
 			},
 		},
 	}
@@ -236,4 +236,66 @@ func TestFileStorage_BatchSet(t *testing.T) {
 			require.Equal(t, tt.want.res, string(res))
 		})
 	}
+}
+
+func TestFileStorage_HandleUserUrls(t *testing.T) {
+	var cfg config.OuterConfig
+	errCfg := cfg.InitConfig(true)
+
+	type want struct {
+		link      string
+		shortLink string
+	}
+	type args struct {
+		fileName string
+		hashLink string
+		userID   int
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "Get",
+			args: args{
+				fileName: filepath.Join(cfg.Default.LinkFile),
+				hashLink: `bbb`,
+			},
+			want: want{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.FileExists(t, tt.args.fileName)
+			require.NoError(t, errCfg)
+
+			err := Store.Init()
+			require.NoError(t, err)
+
+			_, err = Store.HandleUserUrls(nil, tt.args.userID)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestFileStorage_HandleUserUrlsDelete(t *testing.T) {
+	Store.HandleUserUrlsDelete(``, 0)
+}
+
+func TestFileStorage_AsyncSaver(t *testing.T) {
+	go func() {
+		Store.AsyncSaver()
+	}()
+
+	select {
+	case <-time.After(time.Millisecond * 100):
+	case dataErr, ok := <-Store.AsyncSaverStatCh:
+		require.NoError(t, &dataErr)
+		require.True(t, ok)
+	}
+}
+
+func TestFileStorage_Destroy(t *testing.T) {
+	Store.Destroy()
 }

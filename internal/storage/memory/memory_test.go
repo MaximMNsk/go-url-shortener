@@ -112,3 +112,80 @@ func TestStorage_Get(t *testing.T) {
 		})
 	}
 }
+
+func TestStorage_Enabled(t *testing.T) {
+	type want struct {
+		enabled bool
+	}
+
+	type args struct {
+		enabled bool
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Enabled Default`,
+			want: want{
+				enabled: true,
+			},
+		},
+		{
+			name: `Test Enabled Change 1`,
+			args: args{
+				enabled: false,
+			},
+			want: want{
+				enabled: false,
+			},
+		},
+		{
+			name: `Test Enabled Change 2`,
+			args: args{
+				enabled: true,
+			},
+			want: want{
+				enabled: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name != `Test Enabled Default` {
+				MemoryStorage.enabled = tt.args.enabled
+			}
+			assert.Equal(t, tt.want.enabled, MemoryStorage.Enabled())
+		})
+	}
+
+}
+
+func TestStorage_Clear(t *testing.T) {
+	type want struct {
+		clearStorage []StorageItem
+	}
+
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: `Test Clear`,
+			want: want{
+				clearStorage: make([]StorageItem, 0),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			MemoryStorage.Clear()
+			assert.Equal(t, tt.want.clearStorage, MemoryStorage.data)
+		})
+	}
+
+}

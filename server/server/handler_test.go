@@ -3,13 +3,17 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/MaximMNsk/go-url-shortener/internal/models/interface/models/mocks"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	random "github.com/MaximMNsk/go-url-shortener/internal/util/rand"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/carlmjohnson/requests"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +21,7 @@ import (
 
 var Serv Server
 var Cfg config.OuterConfig
+var Link string
 
 func TestErrorDB_Error(t *testing.T) {
 	type args struct {
@@ -179,7 +184,7 @@ func TestHandleOther(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		t.Run(tt.name, func(t *testing.T) {
 			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, nil)
 			require.NoError(t, err)
@@ -191,6 +196,36 @@ func TestHandleOther(t *testing.T) {
 
 			err = resp.Body.Close()
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestServer_Stop(t *testing.T) {
+	type args struct{}
+	type want struct{}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Stop`,
+			args: args{},
+			want: want{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			go func() {
+				// Дождемся реального запуска
+				time.Sleep(200 * time.Millisecond)
+
+				err := Serv.Stop(context.Background())
+				require.NoError(t, err)
+			}()
 		})
 	}
 }
@@ -223,21 +258,20 @@ func TestServer_HandlePing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, nil)
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`Ping`, mock.Anything).Return(true, nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
+
+			request, err := http.NewRequestWithContext(context.Background(), tt.args.method, `http://`+tt.args.addr, nil)
 			require.NoError(t, err)
 
-			resp, err := http.DefaultClient.Do(request)
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want.resp, resp.StatusCode)
-
-			err = resp.Body.Close()
-			require.NoError(t, err)
+			Serv.HandlePing(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
 		})
 	}
 }
-
-var Link string
 
 func TestServer_HandlePOST(t *testing.T) {
 	type args struct {
@@ -269,17 +303,19 @@ func TestServer_HandlePOST(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`Set`, mock.Anything, tt.args.link, mock.Anything, mock.Anything, mock.Anything).
+				Return(nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
+
 			Link = tt.args.link
-			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, strings.NewReader(tt.args.link))
+			request, err := http.NewRequestWithContext(context.Background(), tt.args.method, `http://`+tt.args.addr, strings.NewReader(tt.args.link))
 			require.NoError(t, err)
 
-			resp, err := http.DefaultClient.Do(request)
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want.resp, resp.StatusCode)
-
-			err = resp.Body.Close()
-			require.NoError(t, err)
+			Serv.HandlePOST(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
 		})
 	}
 }
@@ -316,30 +352,89 @@ func TestServer_HandleGET(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			time.Sleep(100 * time.Millisecond)
 			shortLinkID := sha1hash.Create(tt.args.link, 8)
-			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr+`/`+shortLinkID, nil)
+
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`Get`, mock.Anything, shortLinkID).
+				Return(tt.args.link, false, nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
+
+			request, err := http.NewRequestWithContext(context.Background(), tt.args.method, `http://`+tt.args.addr+`/`+shortLinkID, nil)
 			require.NoError(t, err)
 
-			cl := http.DefaultClient
-			cl.CheckRedirect = requests.NoFollow
-			resp, err := cl.Do(request)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want.resp, resp.StatusCode)
+			Serv.HandleGET(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
 
-			originalLink := resp.Header.Get(`Location`)
+			originalLink := resp.Header().Get(`Location`)
 			assert.Equal(t, tt.want.link, originalLink)
-
-			err = resp.Body.Close()
-			require.NoError(t, err)
 		})
 	}
 }
 
-func TestServer_HandlePOST_GET(t *testing.T) {
-	var link string
-	var count = 10
+func TestServer_HandleAPIBatch(t *testing.T) {
+	type args struct {
+		addr   string
+		method string
+		links  string
+	}
+	type want struct {
+		resp  int
+		links string
+	}
 
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test Batch`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				links:  `{"correlation_id": "abcabc","original_url": "http://ya.ru"}`,
+			},
+			want: want{
+				resp:  http.StatusCreated,
+				links: `{"correlation_id": "abcabc","short_url": "` + `http://` + Cfg.Final.AppAddr + `"}`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`BatchSet`, mock.Anything, []byte(tt.args.links), 0).
+				Return([]byte(tt.want.links), nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
+
+			userNumber := cookie.UserNum(`UserID`)
+			ctx := context.WithValue(context.Background(), userNumber, 0)
+			request, err := http.NewRequestWithContext(
+				ctx,
+				tt.args.method,
+				`http://`+tt.args.addr+`/api/shorten/batch`,
+				strings.NewReader(tt.args.links),
+			)
+			require.NoError(t, err)
+
+			Serv.HandleAPIBatch(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
+
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+
+			originalLinks := string(body)
+			assert.Equal(t, tt.want.links, originalLinks)
+		})
+	}
+}
+
+func TestServer_HandleAPIShorten(t *testing.T) {
 	type args struct {
 		addr   string
 		method string
@@ -347,83 +442,60 @@ func TestServer_HandlePOST_GET(t *testing.T) {
 	}
 	type want struct {
 		resp int
-		link string
 	}
+
 	tests := []struct {
 		name string
 		args args
 		want want
 	}{
 		{
-			name: `Test Set`,
+			name: `Test Set API shorten`,
 			args: args{
 				addr:   Cfg.Final.AppAddr,
 				method: http.MethodPost,
-				link:   random.StringBytes(10),
+				link:   `{"url":"url"}`,
 			},
 			want: want{
 				resp: http.StatusCreated,
 			},
 		},
-		{
-			name: `Test Get`,
-			args: args{
-				addr:   Cfg.Final.AppAddr,
-				method: http.MethodGet,
-				link:   link,
-			},
-			want: want{
-				resp: http.StatusTemporaryRedirect,
-				link: link,
-			},
-		},
 	}
 
-	time.Sleep(100 * time.Millisecond)
-	for i := 0; i <= count; i++ {
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`Set`, mock.Anything, `url`, mock.Anything, mock.Anything, 0).
+				Return(nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
 
-				if tt.name == `Test Set` {
-					link = tt.args.link
-					request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr, strings.NewReader(tt.args.link))
-					require.NoError(t, err)
+			userNumber := cookie.UserNum(`UserID`)
+			ctx := context.WithValue(context.Background(), userNumber, 0)
+			request, err := http.NewRequestWithContext(
+				ctx,
+				tt.args.method,
+				`http://`+tt.args.addr+`/api/shorten`,
+				strings.NewReader(tt.args.link),
+			)
+			require.NoError(t, err)
 
-					resp, err := http.DefaultClient.Do(request)
-
-					require.NoError(t, err)
-					assert.Equal(t, tt.want.resp, resp.StatusCode)
-
-					err = resp.Body.Close()
-					require.NoError(t, err)
-				}
-
-				if tt.name == `Test Get` {
-					time.Sleep(100 * time.Millisecond)
-					shortLinkID := sha1hash.Create(link, 8)
-					request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr+`/`+shortLinkID, nil)
-					require.NoError(t, err)
-
-					client := http.DefaultClient
-					client.CheckRedirect = requests.NoFollow
-					resp, err := client.Do(request)
-					require.NoError(t, err)
-					assert.Equal(t, tt.want.resp, resp.StatusCode)
-
-					originalLink := resp.Header.Get(`Location`)
-					assert.Equal(t, link, originalLink)
-
-					err = resp.Body.Close()
-					require.NoError(t, err)
-				}
-			})
-		}
+			Serv.HandleAPIShorten(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
+		})
 	}
 }
 
-func TestServer_Stop(t *testing.T) {
-	type args struct{}
-	type want struct{}
+func TestServer_HandleAPIUserUrls(t *testing.T) {
+	type args struct {
+		addr   string
+		method string
+		userID int
+	}
+	type want struct {
+		resp int
+	}
 
 	tests := []struct {
 		name string
@@ -431,22 +503,79 @@ func TestServer_Stop(t *testing.T) {
 		want want
 	}{
 		{
-			name: `Test Stop`,
-			args: args{},
-			want: want{},
+			name: `Test APIUserUrls`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodGet,
+				userID: 0,
+			},
+			want: want{
+				resp: http.StatusOK,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`HandleUserUrls`, mock.Anything, 0).Return([]byte(`321`), nil)
+			Serv.Storage = storageMock
 
-			go func() {
-				// Дождемся выполнения запросов
-				time.Sleep(2000 * time.Millisecond)
+			userNumber := cookie.UserNum(`UserID`)
+			ctx := context.WithValue(context.Background(), userNumber, tt.args.userID)
+			request, _ := http.NewRequestWithContext(ctx, http.MethodPost, tt.args.addr+`/api/user/urls`, nil)
+			resp := httptest.NewRecorder()
+			Serv.HandleAPIUserUrls(resp, request)
+			require.Equal(t, tt.want.resp, resp.Code)
+		})
+	}
+}
 
-				err := Serv.Stop(context.Background())
-				require.NoError(t, err)
-			}()
+func TestServer_HandleAPIUserUrlsDelete(t *testing.T) {
+	type args struct {
+		addr   string
+		method string
+		link   string
+	}
+	type want struct {
+		resp int
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test User Urls Delete`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodDelete,
+				link:   random.StringBytes(10),
+			},
+			want: want{
+				resp: http.StatusAccepted,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`HandleUserUrlsDelete`, mock.Anything, 0).
+				Return(nil)
+			Serv.Storage = storageMock
+			resp := httptest.NewRecorder()
+
+			userNumber := cookie.UserNum(`UserID`)
+			ctx := context.WithValue(context.Background(), userNumber, 0)
+			request, err := http.NewRequestWithContext(ctx, tt.args.method, `http://`+tt.args.addr+`/api/user/urls`, strings.NewReader(tt.args.link))
+			require.NoError(t, err)
+
+			Serv.HandleAPIUserUrlsDelete(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
 		})
 	}
 }
@@ -459,10 +588,13 @@ func ExampleServer_Init() {
 }
 
 func ExampleServer_Start() {
-	err := Serv.Start(context.Background())
-	if err != nil {
-		fmt.Printf("serv start err:%v\n", err)
-	}
+	go func() {
+		err := Serv.Start(context.Background())
+		if err != nil {
+			fmt.Printf("serv start err:%v\n", err)
+		}
+	}()
+	time.Sleep(100 * time.Millisecond)
 }
 
 func ExampleHandleOther() {
@@ -475,48 +607,62 @@ func ExampleHandleOther() {
 	// Output: 400
 }
 
+func ExampleServer_Stop() {
+	go func() {
+		err := Serv.Stop(context.Background())
+		if err != nil {
+			fmt.Printf("serv stop err:%v\n", err)
+		}
+	}()
+}
+
 func ExampleServer_HandlePing() {
-	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/ping`, nil)
-	response, err := http.DefaultClient.Do(request)
-	if err == nil {
-		fmt.Println(response.StatusCode)
-		_ = response.Body.Close()
-	}
+	var storageMock mocks.Storable
+	storageMock.
+		On(`Ping`, mock.Anything).Return(true, nil)
+	Serv.Storage = &storageMock
+	resp := httptest.NewRecorder()
+
+	request, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, `http://localhost:8080/ping`, nil)
+
+	Serv.HandlePing(resp, request)
+	fmt.Println(resp.Code)
+
 	// Output: 200
 }
 
 func ExampleServer_HandlePOST() {
-	body := strings.NewReader(`ya.ru`)
-	request, _ := http.NewRequest(http.MethodPost, `http://localhost:8080/`, body)
-	response, err := http.DefaultClient.Do(request)
-	if err == nil {
-		fmt.Println(response.StatusCode)
-		_ = response.Body.Close()
-	}
+	var storageMock mocks.Storable
+	storageMock.
+		On(`Set`, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+	Serv.Storage = &storageMock
+	resp := httptest.NewRecorder()
+
+	request, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, `http://localhost:8080/`, strings.NewReader(`ya.ru`))
+
+	Serv.HandlePOST(resp, request)
+	fmt.Println(resp.Code)
+
 	// Output: 201
 }
 
 func ExampleServer_HandleGET() {
-	shortLinkID := sha1hash.Create(`ya.ru`, 8)
-	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
-	client := http.DefaultClient
-	client.CheckRedirect = requests.NoFollow
-	response, err := client.Do(request)
+	link := `ya.ru`
+	shortLinkID := sha1hash.Create(link, 8)
+	var storageMock mocks.Storable
+	storageMock.
+		On(`Get`, mock.Anything, shortLinkID).
+		Return(link, false, nil)
+	Serv.Storage = &storageMock
+	resp := httptest.NewRecorder()
 
-	if err == nil {
-		fmt.Println(response.StatusCode)
-		fmt.Println(response.Header.Get(`Location`))
-		_ = response.Body.Close()
-	}
+	request, _ := http.NewRequest(http.MethodGet, `http://localhost:8080/`+shortLinkID, nil)
+	Serv.HandleGET(resp, request)
+	fmt.Println(resp.Code)
+	fmt.Println(resp.Header().Get("Location"))
 
 	// Output:
 	// 307
 	// ya.ru
-}
-
-func ExampleServer_Stop() {
-	err := Serv.Stop(context.Background())
-	if err != nil {
-		fmt.Printf("serv stop err:%v\n", err)
-	}
 }
