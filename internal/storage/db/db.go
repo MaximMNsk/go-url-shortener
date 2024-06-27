@@ -26,7 +26,7 @@ func Connect(ctx context.Context, conf config.OuterConfig) (*pgxpool.Pool, error
 	return database, err
 }
 
-//// Close - закрывает переданный пул подключений.
-//func Close(DB *pgxpool.Pool) {
-//	DB.Close()
-//}
+// Close - закрывает переданный пул подключений.
+func Close(DB *pgxpool.Pool) {
+	DB.Close()
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/golang-migrate/migrate/v4"
@@ -62,7 +63,7 @@ func (dbs *DBStorage) Destroy() {
 		close(dbs.AsyncSaverStatCh)
 	}
 	if dbs.ConnectionPool != nil {
-		dbs.ConnectionPool.Close()
+		db.Close(dbs.ConnectionPool)
 	}
 }
 
@@ -79,8 +80,8 @@ select original_url, is_deleted from public.short_links where (uid = $1 or origi
 const selectAllRows = `
 select original_url, short_url from public.short_links where user_id = $1`
 
-const updateRow = `
-update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
+//const updateRow = `
+//update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
 const updateRowNoUser = `
 update public.short_links set is_deleted = true where uid = $1`
