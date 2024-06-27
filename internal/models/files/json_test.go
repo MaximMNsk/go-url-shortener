@@ -273,7 +273,7 @@ func TestFileStorage_HandleUserUrls(t *testing.T) {
 			err := Store.Init()
 			require.NoError(t, err)
 
-			_, err = Store.HandleUserUrls(nil, tt.args.userID)
+			_, err = Store.HandleUserUrls(context.Background(), tt.args.userID)
 			require.NoError(t, err)
 		})
 	}

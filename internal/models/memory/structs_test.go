@@ -245,7 +245,7 @@ func TestMemStorage_HandleUserUrls(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NoError(t, errCfg)
 
-			_, err := Store.HandleUserUrls(nil, 0)
+			_, err := Store.HandleUserUrls(context.Background(), 0)
 			require.NoError(t, err)
 		})
 	}

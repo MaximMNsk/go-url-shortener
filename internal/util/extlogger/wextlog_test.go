@@ -60,6 +60,7 @@ func TestLog(t *testing.T) {
 	get, err := http.Get(`http://localhost:8088/`)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, get.StatusCode)
+	err = get.Body.Close()
 
 	go func() {
 		time.Sleep(time.Millisecond * 400)

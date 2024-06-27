@@ -108,6 +108,8 @@ func TestAuthSetter(t *testing.T) {
 	get, err := http.Get(`http://localhost:8089/`)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, get.StatusCode)
+	err = get.Body.Close()
+	require.NoError(t, err)
 
 	go func() {
 		time.Sleep(time.Millisecond * 400)
