@@ -25,7 +25,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"net/http"
-	"net/http/pprof"
 )
 
 // ErrorHandlers - тип для работы с ошибками слоя обработчиков.
@@ -382,6 +381,11 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 // HandleOther - middleware для обработки неожидаемых запросов.
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		logger.PrintLog(logger.DEBUG, `Method: `+req.Method, true)
+		//body, _ := io.ReadAll(req.Body)
+		//defer req.Body.Close()
+		//logger.PrintLog(logger.DEBUG, `Body: `+string(body), true)
+		//logger.PrintLog(logger.DEBUG, req.Method, true)
 		if req.Method == http.MethodGet || req.Method == http.MethodPost || req.Method == http.MethodDelete {
 			next.ServeHTTP(res, req)
 			return
@@ -497,17 +501,17 @@ func (s *Server) Start(ctx context.Context) error {
 		s.Routers.With(extlogger.Log)
 	}
 	s.Routers.Route("/", func(r chi.Router) {
-		s.Routers.Group(func(r chi.Router) {
-			r.HandleFunc("/debug/pprof/*", pprof.Index)
-			r.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			r.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-		})
+		//s.Routers.Group(func(r chi.Router) {
+		//	r.HandleFunc("/debug/pprof/*", pprof.Index)
+		//	r.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		//	r.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		//})
 		s.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthSetter)
 
 			r.Post(`/`, s.HandlePOST)
-			r.Post(`/api/{query}`, s.HandleAPIBatch)
-			r.Post(`/api/shorten/{query}`, s.HandleAPIShorten)
+			r.Post(`/api/{query}`, s.HandleAPIShorten)
+			r.Post(`/api/shorten/{query}`, s.HandleAPIBatch)
 			r.Get(`/ping`, s.HandlePing)
 			r.Get(`/{query}`, s.HandleGET)
 		})

@@ -12,7 +12,6 @@ require (
 	github.com/jackc/pgerrcode v0.0.0-20220416144525-469b46aa5efa
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/kisielk/errcheck v1.7.0
-	github.com/pashagolub/pgxmock/v4 v4.1.0
 	github.com/rs/zerolog v1.30.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/tools v0.17.0
