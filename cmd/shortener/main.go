@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/MaximMNsk/go-url-shortener/server/server"
@@ -11,7 +12,27 @@ import (
 	"time"
 )
 
+// go build -ldflags "-X main.buildVersion=1.20 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=Iter20" main.go
+var (
+	buildVersion string
+	buildDate    string
+	buildCommit  string
+)
+
 func main() {
+	if buildVersion == `` {
+		buildVersion = `N/A`
+	}
+	if buildDate == `` {
+		buildDate = `N/A`
+	}
+	if buildCommit == `` {
+		buildCommit = `N/A`
+	}
+	fmt.Println(`Build version:`, buildVersion)
+	fmt.Println(`Build date:`, buildDate)
+	fmt.Println(`Build commit:`, buildCommit)
+
 	var conf confModule.OuterConfig
 	err := conf.InitConfig(false)
 	if err != nil {
