@@ -55,7 +55,7 @@ func (fs *FileStorage) Destroy() {
 }
 
 // Ping - метод для проверки работоспособности хранилища.
-func (fs *FileStorage) Ping(ctx context.Context) (bool, error) {
+func (fs *FileStorage) Ping(_ context.Context) (bool, error) {
 	return true, nil
 }
 
@@ -70,7 +70,7 @@ type inputOutputData struct {
 // Первый возвращаемый параметр - сокращенный УРЛ,
 // второй - флаг присутствия,
 // третий - ошибка выполнения.
-func (fs *FileStorage) Get(ctx context.Context, shortLink string) (string, bool, error) {
+func (fs *FileStorage) Get(_ context.Context, shortLink string) (string, bool, error) {
 
 	var savedData []inputOutputData
 	getErr := FileError{
@@ -145,7 +145,7 @@ func getData(fileName string) (string, error) {
 
 // Set - сохраняет и сокращает УРЛ.
 // Возвращает статус работы в виде ошибки.
-func (fs *FileStorage) Set(ctx context.Context, originalLink string, shortLink string, hashLink string, _ int) error {
+func (fs *FileStorage) Set(_ context.Context, originalLink string, shortLink string, hashLink string, _ int) error {
 
 	var toSave []inputOutputData
 	var toLoad []inputOutputData
@@ -273,7 +273,7 @@ type outputBatch struct {
 
 // BatchSet - сохраняет и сокращает УРЛ пакетно.
 // Возвращает слайс сокращенных УРЛ в байт-формате, а так же результат выполнения.
-func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, _ int) ([]byte, error) {
+func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, error) {
 
 	var mx sync.Mutex
 	mx.Lock()
@@ -317,9 +317,9 @@ func (fs *FileStorage) BatchSet(ctx context.Context, data []byte, _ int) ([]byte
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
-	toSave := append(savedData, savingData...)
+	savedData = append(savedData, savingData...)
 	var content []byte
-	content, err = json.Marshal(toSave)
+	content, err = json.Marshal(savedData)
 	if err != nil {
 		errBatchSet.message = `marshal error`
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)

@@ -27,8 +27,8 @@ import (
 	"net/http"
 )
 
-// ErrorHandlers - тип для работы с ошибками слоя обработчиков.
-type ErrorHandlers struct {
+// HandlersError - тип для работы с ошибками слоя обработчиков.
+type HandlersError struct {
 	layer          string
 	parentFuncName string
 	funcName       string
@@ -36,7 +36,7 @@ type ErrorHandlers struct {
 }
 
 // Error - заменяет стандартный вызов метода своим.
-func (e *ErrorHandlers) Error() string {
+func (e *HandlersError) Error() string {
 	return fmt.Sprintf("[%s](%s/%s): %s", e.layer, e.parentFuncName, e.funcName, e.message)
 }
 
@@ -362,7 +362,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	handlePingErr := &ErrorHandlers{
+	handlePingErr := &HandlersError{
 		layer:          `Handlers`,
 		funcName:       `ChooseStorage`,
 		parentFuncName: `-`,
@@ -393,7 +393,7 @@ func HandleOther(next http.Handler) http.Handler {
 // Работает с конфигурацией, которую принимает вторым параметром.
 // Возвращает модель для работы с хранилищем и ошибку.
 func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Storable, error) {
-	pgCsErr := &ErrorHandlers{
+	pgCsErr := &HandlersError{
 		layer:          `Handlers`,
 		funcName:       `ChooseStorage`,
 		parentFuncName: `-`,
@@ -456,7 +456,7 @@ type Server struct {
 
 // Init - инициализирует сервер параметрами.
 func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) error {
-	handleInitErr := &ErrorHandlers{
+	handleInitErr := &HandlersError{
 		layer:          `Handlers`,
 		funcName:       `Init`,
 		parentFuncName: `-`,
@@ -480,7 +480,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	storage, err := ChooseStorage(ctx, s.Config)
 	if err != nil {
-		var serverHandlersErr *ErrorHandlers
+		var serverHandlersErr *HandlersError
 		if errors.As(err, &serverHandlersErr) {
 			return fmt.Errorf(`can't handle storage: %w`, err)
 		}

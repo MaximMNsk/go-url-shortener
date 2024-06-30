@@ -67,6 +67,9 @@ func (dbs *DBStorage) Destroy() {
 	}
 }
 
+const connectError = `connection to DB not found`
+const poolIsNilError = `connection pool is nil`
+
 const insertLinkRow = `
 insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
@@ -121,7 +124,7 @@ func (dbs *DBStorage) Ping(ctx context.Context) (bool, error) {
 			layer:          layer,
 			parentFuncName: `-`,
 			funcName:       `Ping`,
-			message:        `Connection pool is nil`,
+			message:        poolIsNilError,
 		})
 	}
 
@@ -149,7 +152,7 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 			layer:          layer,
 			parentFuncName: `-`,
 			funcName:       `Get`,
-			message:        `Connection pool is nil`,
+			message:        poolIsNilError,
 		})
 	}
 	getErr := DBError{
@@ -167,7 +170,7 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 	defer acquire.Release()
 
 	if acquire == nil {
-		connErr := errors.New("connection to DB not found")
+		connErr := errors.New(connectError)
 		getErr.message = connErr.Error()
 		return ``, false, &getErr
 	}
@@ -198,7 +201,7 @@ func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink st
 			layer:          layer,
 			parentFuncName: `-`,
 			funcName:       `Set`,
-			message:        `Connection pool is nil`,
+			message:        poolIsNilError,
 		})
 	}
 
@@ -266,7 +269,7 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 	}
 
 	if dbs.ConnectionPool == nil {
-		errBatchSet.message = "connection to DB not found"
+		errBatchSet.message = connectError
 		return nil, &errBatchSet
 	}
 
@@ -326,7 +329,7 @@ func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, e
 	}
 
 	if dbs.ConnectionPool == nil {
-		errHandleUserUrls.message = "connection to DB not found"
+		errHandleUserUrls.message = connectError
 		return nil, &errHandleUserUrls
 	}
 
@@ -394,7 +397,7 @@ func (dbs *DBStorage) AsyncSaver() {
 	}
 
 	if dbs.ConnectionPool == nil {
-		errHandleUserUrlsDelete.message = "connection to DB not found"
+		errHandleUserUrlsDelete.message = connectError
 		dbs.AsyncSaverStatCh <- errHandleUserUrlsDelete
 	}
 

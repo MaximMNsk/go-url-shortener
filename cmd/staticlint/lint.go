@@ -61,7 +61,14 @@ func main() {
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	localInspector := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
+	iLocalInspector, ok := pass.ResultOf[inspect.Analyzer]
+	if !ok {
+		return nil, nil
+	}
+	localInspector, ok := iLocalInspector.(*inspector.Inspector)
+	if !ok {
+		return nil, nil
+	}
 
 	nodeFilter := []ast.Node{
 		(*ast.CallExpr)(nil),

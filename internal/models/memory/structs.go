@@ -130,7 +130,7 @@ func (ms *MemStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, e
 	}
 
 	var savingData []memoryStorage.StorageItem
-	var outputData []outputBatch
+	outputData := make([]outputBatch, 0, len(savingData))
 
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
