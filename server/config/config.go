@@ -109,78 +109,38 @@ func (config *OuterConfig) InitConfig(testMode bool) error {
 	switch {
 	case config.Env.AppAddr != "":
 		config.Final.AppAddr = config.Env.AppAddr
-		break
 	case config.Flag.AppAddr != "":
 		config.Final.AppAddr = config.Flag.AppAddr
-		break
 	default:
 		config.Final.AppAddr = config.Default.AppAddr
 	}
 
-	//if config.Env.AppAddr != "" {
-	//	config.Final.AppAddr = config.Env.AppAddr
-	//} else if config.Flag.AppAddr != "" {
-	//	config.Final.AppAddr = config.Flag.AppAddr
-	//} else {
-	//	config.Final.AppAddr = config.Default.AppAddr
-	//}
-
 	switch {
 	case config.Env.ShortURLAddr != "":
 		config.Final.ShortURLAddr = config.Env.ShortURLAddr
-		break
 	case config.Flag.ShortURLAddr != "":
 		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
-		break
 	default:
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
 
-	//if config.Env.ShortURLAddr != "" {
-	//	config.Final.ShortURLAddr = config.Env.ShortURLAddr
-	//} else if config.Flag.ShortURLAddr != "" {
-	//	config.Final.ShortURLAddr = config.Flag.ShortURLAddr
-	//} else {
-	//	config.Final.ShortURLAddr = config.Default.ShortURLAddr
-	//}
-
 	switch {
 	case config.Env.LinkFile != "":
 		config.Final.LinkFile = config.Env.LinkFile
-		break
 	case config.Flag.LinkFile != "":
 		config.Final.LinkFile = config.Flag.LinkFile
-		break
 	default:
 		config.Final.LinkFile = config.Default.LinkFile
 	}
 
-	//if config.Env.LinkFile != "" {
-	//	config.Final.LinkFile = config.Env.LinkFile
-	//} else if config.Flag.LinkFile != "" {
-	//	config.Final.LinkFile = config.Flag.LinkFile
-	//} else {
-	//	config.Final.LinkFile = config.Default.LinkFile
-	//}
-
 	switch {
 	case config.Env.DB != "":
 		config.Final.DB = config.Env.DB
-		break
 	case config.Flag.DB != "":
 		config.Final.DB = config.Flag.DB
-		break
 	default:
 		config.Final.DB = config.Default.DB
 	}
-
-	//if config.Env.DB != "" {
-	//	config.Final.DB = config.Env.DB
-	//} else if config.Flag.DB != "" {
-	//	config.Final.DB = config.Flag.DB
-	//} else {
-	//	config.Final.DB = config.Default.DB
-	//}
 
 	err = config.handleFinal()
 	return err
