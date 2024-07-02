@@ -28,7 +28,7 @@ func TestRandStringBytes(t *testing.T) {
 
 func BenchmarkRandStringBytes(b *testing.B) {
 	count := 10000
-	b.Run(`RandStringBytes`, func(b *testing.B) {
+	b.Run(`RandStringBytes`, func(_ *testing.B) {
 		for i := 0; i < count; i++ {
 			_ = StringBytes(20)
 		}

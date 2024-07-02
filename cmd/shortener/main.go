@@ -1,15 +1,17 @@
+// Package main - основной пакет приложения.
 package main
 
 import (
 	"context"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/MaximMNsk/go-url-shortener/server/server"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/server"
 )
 
 // go build -ldflags "-X main.buildVersion=1.20 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=Iter20" main.go

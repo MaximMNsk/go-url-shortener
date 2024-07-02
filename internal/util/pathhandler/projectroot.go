@@ -1,3 +1,4 @@
+// Package pathhandler - пакет для поиска корневой директории проекта.
 package pathhandler
 
 import (
@@ -16,10 +17,8 @@ func ProjectRoot() (string, error) {
 			modFile := filepath.Join(currentPath, "go.mod")
 			if _, err = os.Stat(modFile); err == nil {
 				break
-			} else {
-				err = os.Chdir("../")
-				continue
 			}
+			err = os.Chdir("../")
 		}
 	}
 

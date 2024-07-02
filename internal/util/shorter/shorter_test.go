@@ -52,7 +52,7 @@ func BenchmarkGetShortURL(b *testing.B) {
 	}
 
 	for _, tt := range tests {
-		b.Run(`GetShortURL`, func(b *testing.B) {
+		b.Run(`GetShortURL`, func(_ *testing.B) {
 			for i := 0; i < count; i++ {
 				_ = GetShortURL(tt.args.addr, tt.args.linkID)
 			}

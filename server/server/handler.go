@@ -6,6 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	model "github.com/MaximMNsk/go-url-shortener/internal/models/interface/models"
@@ -20,11 +27,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
-	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5/pgconn"
-	"io"
-	"net/http"
 )
 
 // HandlersError - тип для работы с ошибками слоя обработчиков.
@@ -495,7 +497,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.LogEnabled {
 		s.Routers.With(extlogger.Log)
 	}
-	s.Routers.Route("/", func(r chi.Router) {
+	s.Routers.Route("/", func(_ chi.Router) {
 		//s.Routers.Group(func(r chi.Router) {
 		//	r.HandleFunc("/debug/pprof/*", pprof.Index)
 		//	r.HandleFunc("/debug/pprof/profile", pprof.Profile)

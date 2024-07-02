@@ -279,7 +279,7 @@ func TestFileStorage_HandleUserUrls(t *testing.T) {
 	}
 }
 
-func TestFileStorage_HandleUserUrlsDelete(t *testing.T) {
+func TestFileStorage_HandleUserUrlsDelete(_ *testing.T) {
 	Store.HandleUserUrlsDelete(``, 0)
 }
 
@@ -296,6 +296,6 @@ func TestFileStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestFileStorage_Destroy(t *testing.T) {
+func TestFileStorage_Destroy(_ *testing.T) {
 	Store.Destroy()
 }

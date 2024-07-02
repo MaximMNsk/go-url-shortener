@@ -290,6 +290,6 @@ func TestMemStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestMemStorage_Destroy(t *testing.T) {
+func TestMemStorage_Destroy(_ *testing.T) {
 	Store.Destroy()
 }

@@ -1,13 +1,15 @@
+// Package memory - прикладной пакет для работы с хранилищем в памяти.
 package memory
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+
 	memoryStorage "github.com/MaximMNsk/go-url-shortener/internal/storage/memory"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
-	"sync"
 )
 
 // MemError - определение ошибки слоя хранилища в памяти.

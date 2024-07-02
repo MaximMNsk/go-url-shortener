@@ -1,3 +1,4 @@
+// Package files - прикладной пакет для работы с файловым хранилищем.
 package files
 
 import (
@@ -5,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"io"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 )
 
 // FileError - определение ошибки слоя файлового хранилища.
@@ -286,7 +288,7 @@ func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, 
 	}
 
 	var savingData []inputBatch
-	var outputData []outputBatch
+	outputData := make([]outputBatch, 0, len(savingData))
 
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {

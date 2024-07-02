@@ -3,16 +3,18 @@ package extlogger
 
 import (
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 )
 
-// Header
+// Header - для переопределения заголовков.
 type Header http.Header
 
 // ResponseWriter - интерфейс, который определяет структуру пакета.

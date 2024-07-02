@@ -1,9 +1,12 @@
+// Package main - пакет статического анализа кода проекта
 package main
 
 import (
+	"go/ast"
+	"strings"
+
 	"github.com/gordonklaus/ineffassign/pkg/ineffassign"
 	"github.com/kisielk/errcheck/errcheck"
-	"go/ast"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -13,7 +16,6 @@ import (
 	"golang.org/x/tools/go/analysis/passes/structtag"
 	"golang.org/x/tools/go/ast/inspector"
 	"honnef.co/go/tools/staticcheck"
-	"strings"
 )
 
 // ExitAnalizer - анализирует использование функции os.Exit в функции main пакета main.

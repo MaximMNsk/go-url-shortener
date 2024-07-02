@@ -25,7 +25,7 @@ func TestLoggingResponseWriter_Write(t *testing.T) {
 	require.Equal(t, 1, write)
 }
 
-func TestLoggingResponseWriter_WriteHeader(t *testing.T) {
+func TestLoggingResponseWriter_WriteHeader(_ *testing.T) {
 	var w httptest.ResponseRecorder
 	data := &responseData{
 		status: 0,
@@ -42,7 +42,7 @@ func TestLog(t *testing.T) {
 	router := chi.NewRouter()
 	router.Group(func(r chi.Router) {
 		r.Use(Log)
-		r.Get(`/`, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(`/`, func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	})

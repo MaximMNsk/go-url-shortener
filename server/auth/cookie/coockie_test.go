@@ -90,7 +90,7 @@ func TestAuthSetter(t *testing.T) {
 	router := chi.NewRouter()
 	router.Group(func(r chi.Router) {
 		r.Use(AuthSetter)
-		r.Get(`/`, func(w http.ResponseWriter, r *http.Request) {
+		r.Get(`/`, func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	})

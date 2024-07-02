@@ -258,6 +258,6 @@ func TestDBStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestDBStorage_Destroy(t *testing.T) {
+func TestDBStorage_Destroy(_ *testing.T) {
 	Store.Destroy()
 }

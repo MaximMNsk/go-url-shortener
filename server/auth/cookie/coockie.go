@@ -7,12 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/randomizer"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
-	"github.com/golang-jwt/jwt/v4"
-	"net/http"
-	"time"
 )
 
 // UserNum - тип для номера пользователя.

@@ -1,3 +1,4 @@
+// Package memorystorage - определяет хранилище в памяти
 package memorystorage
 
 // StorageItem - единица хранения УРЛ в памяти.

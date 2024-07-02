@@ -1,11 +1,14 @@
+// Package db - создает и закрывает коннект-пул с БД
 package db
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"time"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"time"
+
+	"github.com/MaximMNsk/go-url-shortener/server/config"
 )
 
 // Connect - создает пул подключений к БД.

@@ -4,10 +4,11 @@ package compress
 
 import (
 	"compress/gzip"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
 )
 
 type compressWriter struct {

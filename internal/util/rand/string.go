@@ -1,3 +1,4 @@
+// Package rand - строковый генератор.
 package rand
 
 import "math/rand"

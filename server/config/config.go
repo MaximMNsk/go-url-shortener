@@ -4,11 +4,13 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
-	"github.com/caarlos0/env/v6"
 	"net"
 	"path/filepath"
 	"strings"
+
+	"github.com/caarlos0/env/v6"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 )
 
 const localHost = "http://localhost"
@@ -104,37 +106,81 @@ func (config *OuterConfig) InitConfig(testMode bool) error {
 		config.parseFlags()
 	}
 
-	if config.Env.AppAddr != "" {
+	switch {
+	case config.Env.AppAddr != "":
 		config.Final.AppAddr = config.Env.AppAddr
-	} else if config.Flag.AppAddr != "" {
+		break
+	case config.Flag.AppAddr != "":
 		config.Final.AppAddr = config.Flag.AppAddr
-	} else {
+		break
+	default:
 		config.Final.AppAddr = config.Default.AppAddr
 	}
 
-	if config.Env.ShortURLAddr != "" {
+	//if config.Env.AppAddr != "" {
+	//	config.Final.AppAddr = config.Env.AppAddr
+	//} else if config.Flag.AppAddr != "" {
+	//	config.Final.AppAddr = config.Flag.AppAddr
+	//} else {
+	//	config.Final.AppAddr = config.Default.AppAddr
+	//}
+
+	switch {
+	case config.Env.ShortURLAddr != "":
 		config.Final.ShortURLAddr = config.Env.ShortURLAddr
-	} else if config.Flag.ShortURLAddr != "" {
+		break
+	case config.Flag.ShortURLAddr != "":
 		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
-	} else {
+		break
+	default:
 		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
 
-	if config.Env.LinkFile != "" {
+	//if config.Env.ShortURLAddr != "" {
+	//	config.Final.ShortURLAddr = config.Env.ShortURLAddr
+	//} else if config.Flag.ShortURLAddr != "" {
+	//	config.Final.ShortURLAddr = config.Flag.ShortURLAddr
+	//} else {
+	//	config.Final.ShortURLAddr = config.Default.ShortURLAddr
+	//}
+
+	switch {
+	case config.Env.LinkFile != "":
 		config.Final.LinkFile = config.Env.LinkFile
-	} else if config.Flag.LinkFile != "" {
+		break
+	case config.Flag.LinkFile != "":
 		config.Final.LinkFile = config.Flag.LinkFile
-	} else {
+		break
+	default:
 		config.Final.LinkFile = config.Default.LinkFile
 	}
 
-	if config.Env.DB != "" {
+	//if config.Env.LinkFile != "" {
+	//	config.Final.LinkFile = config.Env.LinkFile
+	//} else if config.Flag.LinkFile != "" {
+	//	config.Final.LinkFile = config.Flag.LinkFile
+	//} else {
+	//	config.Final.LinkFile = config.Default.LinkFile
+	//}
+
+	switch {
+	case config.Env.DB != "":
 		config.Final.DB = config.Env.DB
-	} else if config.Flag.DB != "" {
+		break
+	case config.Flag.DB != "":
 		config.Final.DB = config.Flag.DB
-	} else {
+		break
+	default:
 		config.Final.DB = config.Default.DB
 	}
+
+	//if config.Env.DB != "" {
+	//	config.Final.DB = config.Env.DB
+	//} else if config.Flag.DB != "" {
+	//	config.Final.DB = config.Flag.DB
+	//} else {
+	//	config.Final.DB = config.Default.DB
+	//}
 
 	err = config.handleFinal()
 	return err

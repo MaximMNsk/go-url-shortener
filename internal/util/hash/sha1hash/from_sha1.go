@@ -1,3 +1,4 @@
+// Package sha1hash - генератор хэша.
 package sha1hash
 
 import (
