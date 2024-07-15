@@ -1,8 +1,7 @@
-package files
+package memory
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,11 +10,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var Store FileStorage
+var Store MemStorage
 
-func TestFileStorage_Init(t *testing.T) {
+func TestMemStorage_Init(t *testing.T) {
 	type want struct {
-		DBErr FileError
+		MemErr MemError
 	}
 	tests := []struct {
 		name string
@@ -24,7 +23,7 @@ func TestFileStorage_Init(t *testing.T) {
 		{
 			name: `Test Init`,
 			want: want{
-				DBErr: FileError{
+				MemErr: MemError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `prepare`,
@@ -39,7 +38,7 @@ func TestFileStorage_Init(t *testing.T) {
 			var cfg config.OuterConfig
 			ConfErr := cfg.InitConfig(true)
 			require.NoError(t, ConfErr)
-			Store = FileStorage{
+			Store = MemStorage{
 				Cfg: cfg,
 			}
 
@@ -49,7 +48,7 @@ func TestFileStorage_Init(t *testing.T) {
 	}
 }
 
-func TestFileStorage_Ping(t *testing.T) {
+func TestMemStorage_Ping(t *testing.T) {
 	type want struct {
 		pingRes bool
 	}
@@ -78,13 +77,11 @@ func TestFileStorage_Ping(t *testing.T) {
 	}
 }
 
-func TestFileStorage_Set(t *testing.T) {
-
+func TestMemStorage_Set(t *testing.T) {
 	var cfg config.OuterConfig
 	errCfg := cfg.InitConfig(true)
 
 	type args struct {
-		fileName  string
 		link      string
 		shortLink string
 		hashLink  string
@@ -96,7 +93,6 @@ func TestFileStorage_Set(t *testing.T) {
 		{
 			name: "Set",
 			args: args{
-				fileName:  filepath.Join(cfg.Default.LinkFile),
 				link:      `aaa`,
 				shortLink: `http://localhost:8080/bbb`,
 				hashLink:  `bbb`,
@@ -107,19 +103,13 @@ func TestFileStorage_Set(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require.NoError(t, errCfg)
 
-			Store.Cfg = cfg
-			err := Store.Init()
+			err := Store.Set(context.Background(), tt.args.link, tt.args.shortLink, tt.args.hashLink, 0)
 			require.NoError(t, err)
-
-			err = Store.Set(context.Background(), tt.args.link, tt.args.shortLink, tt.args.hashLink, 0)
-			require.NoError(t, err)
-			require.FileExists(t, filepath.Join(tt.args.fileName))
 		})
 	}
 }
 
-func TestFileStorage_Get(t *testing.T) {
-
+func TestMemStorage_Get(t *testing.T) {
 	var cfg config.OuterConfig
 	errCfg := cfg.InitConfig(true)
 
@@ -139,7 +129,6 @@ func TestFileStorage_Get(t *testing.T) {
 		{
 			name: "Get",
 			args: args{
-				fileName: filepath.Join(cfg.Default.LinkFile),
 				hashLink: `bbb`,
 			},
 			want: want{
@@ -150,11 +139,7 @@ func TestFileStorage_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.FileExists(t, tt.args.fileName)
 			require.NoError(t, errCfg)
-
-			err := Store.Init()
-			require.NoError(t, err)
 
 			link, _, err := Store.Get(context.Background(), tt.args.hashLink)
 			require.NoError(t, err)
@@ -163,7 +148,7 @@ func TestFileStorage_Get(t *testing.T) {
 	}
 }
 
-func TestErrorFile_Error(t *testing.T) {
+func TestErrorMemory_Error(t *testing.T) {
 	type args struct {
 		layer          string
 		parentFuncName string
@@ -195,7 +180,7 @@ func TestErrorFile_Error(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := FileError{
+			err := MemError{
 				layer:          tt.args.layer,
 				funcName:       tt.args.funcName,
 				message:        tt.args.message,
@@ -207,7 +192,7 @@ func TestErrorFile_Error(t *testing.T) {
 	}
 }
 
-func TestFileStorage_BatchSet(t *testing.T) {
+func TestMemStorage_BatchSet(t *testing.T) {
 	type args struct {
 		URLs string
 	}
@@ -239,52 +224,61 @@ func TestFileStorage_BatchSet(t *testing.T) {
 	}
 }
 
-func TestFileStorage_HandleUserUrls(t *testing.T) {
+func TestMemStorage_HandleUserUrls(t *testing.T) {
 	var cfg config.OuterConfig
 	errCfg := cfg.InitConfig(true)
 
-	type want struct {
+	type args struct {
 		link      string
 		shortLink string
-	}
-	type args struct {
-		fileName string
-		hashLink string
-		userID   int
+		hashLink  string
 	}
 	tests := []struct {
 		name string
 		args args
-		want want
 	}{
 		{
-			name: "Get",
-			args: args{
-				fileName: filepath.Join(cfg.Default.LinkFile),
-				hashLink: `bbb`,
-			},
-			want: want{},
+			name: "HandleUserUrls",
+			args: args{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.FileExists(t, tt.args.fileName)
 			require.NoError(t, errCfg)
 
-			err := Store.Init()
-			require.NoError(t, err)
-
-			_, err = Store.HandleUserUrls(context.Background(), tt.args.userID)
+			_, err := Store.HandleUserUrls(context.Background(), 0)
 			require.NoError(t, err)
 		})
 	}
 }
 
-func TestFileStorage_HandleUserUrlsDelete(_ *testing.T) {
-	Store.HandleUserUrlsDelete(``, 0)
+func TestMemStorage_HandleUserUrlsDelete(t *testing.T) {
+	type args struct {
+		link      string
+		shortLink string
+		hashLink  string
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{
+			name: "HandleUserUrlsDelete",
+			args: args{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var cfg config.OuterConfig
+			errCfg := cfg.InitConfig(true)
+			require.NoError(t, errCfg)
+
+			Store.HandleUserUrlsDelete(``, 0)
+		})
+	}
 }
 
-func TestFileStorage_AsyncSaver(t *testing.T) {
+func TestMemStorage_AsyncSaver(t *testing.T) {
 	go func() {
 		Store.AsyncSaver()
 	}()
@@ -297,7 +291,7 @@ func TestFileStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestFileStorage_Destroy(t *testing.T) {
+func TestMemStorage_Destroy(t *testing.T) {
 	err := Store.Destroy()
 	require.NoError(t, err)
 }
