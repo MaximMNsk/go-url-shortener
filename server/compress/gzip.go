@@ -57,6 +57,7 @@ func newCompressReader(r io.ReadCloser) (*compressReader, error) {
 	if err != nil {
 		return nil, err
 	}
+	zr.Multistream(false)
 
 	return &compressReader{
 		r:  r,
@@ -90,8 +91,8 @@ func GzipHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		//ow := w
-		var ow http.ResponseWriter
+		ow := w
+		//var ow http.ResponseWriter
 
 		// проверяем, что клиент умеет получать от сервера сжатые данные в формате gzip
 		acceptEncoding := r.Header.Get("Accept-Encoding")
@@ -118,6 +119,7 @@ func GzipHandler(next http.Handler) http.Handler {
 			// оборачиваем тело запроса в io.Reader с поддержкой декомпрессии
 			cr, err := newCompressReader(r.Body)
 			if err != nil {
+				logger.PrintLog(logger.ERROR, err.Error(), true)
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}

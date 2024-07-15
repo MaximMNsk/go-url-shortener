@@ -49,11 +49,12 @@ func (fs *FileStorage) Init() error {
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (fs *FileStorage) Destroy() {
+func (fs *FileStorage) Destroy() error {
 	if fs.AsyncSaverStatCh != nil {
 		close(fs.AsyncSaverStatCh)
 	}
 	fs.StorageExists = false
+	return nil
 }
 
 // Ping - метод для проверки работоспособности хранилища.

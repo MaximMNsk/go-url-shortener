@@ -1,11 +1,12 @@
 package logger
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPrintLog(t *testing.T) {
@@ -39,6 +40,30 @@ func TestPrintLog(t *testing.T) {
 				part1 string
 				part2 string
 			}{part1: `INFO`, part2: `Some message`}},
+		},
+		{
+			name: `Test debug`,
+			args: args{level: DEBUG, message: `Some message`},
+			want: want{message: struct {
+				part1 string
+				part2 string
+			}{part1: `DEBUG`, part2: `Some message`}},
+		},
+		{
+			name: `Test warning`,
+			args: args{level: WARN, message: `Some message`},
+			want: want{message: struct {
+				part1 string
+				part2 string
+			}{part1: `WARN`, part2: `Some message`}},
+		},
+		{
+			name: `Test fatal`,
+			args: args{level: FATAL, message: `Some message`},
+			want: want{message: struct {
+				part1 string
+				part2 string
+			}{part1: `FATAL`, part2: `Some message`}},
 		},
 	}
 	for _, tt := range tests {

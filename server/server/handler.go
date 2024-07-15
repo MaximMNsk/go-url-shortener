@@ -9,10 +9,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5/pgconn"
-
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	model "github.com/MaximMNsk/go-url-shortener/internal/models/interface/models"
@@ -27,6 +23,9 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // HandlersError - тип для работы с ошибками слоя обработчиков.
@@ -79,7 +78,7 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 			InnerData: saved,
 		}
 		// Если есть, отдаем 307 редирект.
-		logger.PrintLog(logger.INFO, "Success", s.LogEnabled)
+		logger.PrintLog(logger.INFO, "Success: "+saved, s.LogEnabled)
 		httpResp.TempRedirect(res, additional)
 		return
 	}
@@ -393,57 +392,55 @@ func HandleOther(next http.Handler) http.Handler {
 
 // ChooseStorage - метод выбора хранилища в зависимости от параметров конфигурации.
 // Работает с конфигурацией, которую принимает вторым параметром.
-// Возвращает модель для работы с хранилищем и ошибку.
-func ChooseStorage(ctx context.Context, conf confModule.OuterConfig) (model.Storable, error) {
-	pgCsErr := &HandlersError{
+// Возвращает ошибку.
+func (s *Server) ChooseStorage(ctx context.Context, conf confModule.OuterConfig) error {
+	pgCsErr := HandlersError{
 		layer:          `Handlers`,
 		funcName:       `ChooseStorage`,
 		parentFuncName: `-`,
 	}
 
-	var storage model.Storable
-
 	if conf.Env.DB != "" || conf.Flag.DB != "" {
-		pgPool, err := db.Connect(ctx, conf)
+		pgPool, err := db.NewPool(ctx, conf)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		storage = &database.DBStorage{
+		s.Storage = &database.DBStorage{
 			ConnectionPool: pgPool,
 			Cfg:            conf,
 		}
-		err = storage.Init()
+		err = s.Storage.Init()
 		if err != nil {
 			pgCsErr.message = `can't init DB storage`
-			return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
+			return fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 		}
 
-		go storage.AsyncSaver()
-		return storage, nil
+		go s.Storage.AsyncSaver()
+		return nil
 	}
 
 	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
-		storage = &files.FileStorage{
+		s.Storage = &files.FileStorage{
 			Cfg: conf,
 		}
-		err := storage.Init()
+		err := s.Storage.Init()
 		if err != nil {
 			pgCsErr.message = `can't init file storage`
-			return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
+			return fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 		}
-		return storage, nil
+		return nil
 	}
 
-	storage = &memory.MemStorage{
+	s.Storage = &memory.MemStorage{
 		Storage: memoryStorage.Storage{},
 		Cfg:     conf,
 	}
-	err := storage.Init()
+	err := s.Storage.Init()
 	if err != nil {
 		pgCsErr.message = `can't init memory storage`
-		return storage, fmt.Errorf(pgCsErr.Error()+`: %w`, err)
+		return fmt.Errorf(pgCsErr.Error()+`: %w`, err)
 	}
-	return storage, nil
+	return nil
 }
 
 // Server - основная структура сервера, определяющая его работу.
@@ -457,7 +454,7 @@ type Server struct {
 }
 
 // Init - инициализирует сервер параметрами.
-func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) error {
+func (s *Server) Init(ctx context.Context, cfg confModule.OuterConfig, needLogging bool) error {
 	handleInitErr := &HandlersError{
 		layer:          `Handlers`,
 		funcName:       `Init`,
@@ -471,32 +468,27 @@ func (s *Server) Init(cfg confModule.OuterConfig, needLogging bool) error {
 	s.Config = cfg
 	s.LogEnabled = needLogging
 	s.ShutdownProcess = false
+	err := s.ChooseStorage(ctx, cfg)
+	if err != nil {
+		handleInitErr.message = err.Error()
+		return handleInitErr
+	}
 	return nil
 }
 
 // Start - запускает сервер в работу.
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Start() error {
 	if s.ShutdownProcess {
 		return nil
 	}
 
-	storage, err := ChooseStorage(ctx, s.Config)
-	if err != nil {
-		var serverHandlersErr *HandlersError
-		if errors.As(err, &serverHandlersErr) {
-			return fmt.Errorf(`can't handle storage: %w`, err)
-		}
-		return fmt.Errorf(`can't create storage environment: %w`, err)
-	}
-
-	s.Storage = storage
-
 	s.Routers = chi.NewRouter().
-		With(compress.GzipHandler).
+		//With(compress.GzipHandler).
 		With(HandleOther)
 	if s.LogEnabled {
-		s.Routers.With(extlogger.Log)
+		s.Routers.Use(extlogger.Log)
 	}
+	s.Routers.Use(compress.GzipHandler)
 	s.Routers.Route("/", func(_ chi.Router) {
 		//s.Routers.Group(func(r chi.Router) {
 		//	r.HandleFunc("/debug/pprof/*", pprof.Index)
@@ -522,7 +514,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.HTTP.Addr = s.Config.Final.AppAddr
 	s.HTTP.Handler = s.Routers
-	err = s.HTTP.ListenAndServe()
+	err := s.HTTP.ListenAndServe()
 	if err != nil {
 		if errors.Is(err, http.ErrServerClosed) && s.ShutdownProcess {
 			return nil
@@ -536,8 +528,11 @@ func (s *Server) Start(ctx context.Context) error {
 // Stop - останавливает сервер.
 func (s *Server) Stop(ctx context.Context) error {
 	s.ShutdownProcess = true
-	s.Storage.Destroy()
-	err := s.HTTP.Shutdown(ctx)
+	err := s.Storage.Destroy()
+	if err != nil {
+		return err
+	}
+	err = s.HTTP.Shutdown(ctx)
 	if err != nil {
 		return err
 	}

@@ -44,5 +44,5 @@ type Storable interface {
 
 	// Destroy - останавливает работу хранилища.
 	// Рекомендуется использовать для Graceful Shutdown
-	Destroy()
+	Destroy() error
 }

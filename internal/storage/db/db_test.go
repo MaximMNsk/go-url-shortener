@@ -2,16 +2,17 @@ package db
 
 import (
 	"context"
+	"testing"
+
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestConnect(t *testing.T) {
 
 	var Conf config.OuterConfig
-	Err := Conf.InitConfig(true)
+	err := Conf.InitConfig(true)
 
 	type args struct {
 		connectString string
@@ -37,9 +38,9 @@ func TestConnect(t *testing.T) {
 				assert.NotEmpty(t, Conf.Final.DB)
 			}
 
-			require.NoError(t, Err)
+			require.NoError(t, err)
 			ctx := context.Background()
-			pgPool, err := Connect(ctx, Conf)
+			pgPool, err := NewPool(ctx, Conf)
 			require.NoError(t, err)
 			defer pgPool.Close()
 			err = pgPool.Ping(ctx)
@@ -48,3 +49,9 @@ func TestConnect(t *testing.T) {
 	}
 
 }
+
+//func TestClose(t *testing.T) {
+//	var pool *pgxpool.Pool
+//	err := Close(pool)
+//	require.Error(t, err, `DB is nil`)
+//}

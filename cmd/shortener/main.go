@@ -45,7 +45,7 @@ func main() {
 	ctx := context.Background()
 
 	var serv server.Server
-	err = serv.Init(conf, true)
+	err = serv.Init(ctx, conf, false)
 	if err != nil {
 		logger.PrintLog(logger.INFO, "Server init error", true)
 		return
@@ -70,7 +70,7 @@ func main() {
 	}()
 
 	logger.PrintLog(logger.INFO, `Start server`, serv.LogEnabled)
-	err = serv.Start(ctx)
+	err = serv.Start()
 	if err != nil {
 		logger.PrintLog(logger.ERROR, err.Error(), serv.LogEnabled)
 	}

@@ -8,16 +8,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/golang-migrate/migrate/v4"
-
 	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/jackc/pgx/v5"
 )
 
 // DBError - определение ошибки слоя БД.
@@ -45,7 +42,7 @@ const layer = `DB`
 type DBStorage struct {
 	ToDeleteCh       chan DeleteItem
 	AsyncSaverStatCh chan DBError
-	ConnectionPool   *pgxpool.Pool
+	ConnectionPool   db.Pool
 	Cfg              confModule.OuterConfig
 }
 
@@ -58,16 +55,15 @@ func (dbs *DBStorage) Init() error {
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (dbs *DBStorage) Destroy() {
+func (dbs *DBStorage) Destroy() error {
 	if dbs.ToDeleteCh != nil {
 		close(dbs.ToDeleteCh)
 	}
 	if dbs.AsyncSaverStatCh != nil {
 		close(dbs.AsyncSaverStatCh)
 	}
-	if dbs.ConnectionPool != nil {
-		db.Close(dbs.ConnectionPool)
-	}
+	dbs.ConnectionPool.Close()
+	return nil
 }
 
 const connectError = `connection to DB not found`
@@ -165,26 +161,25 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 		message:        `Error occurred`,
 	}
 
-	acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	if err != nil {
-		getErr.message = err.Error()
-		return ``, false, &getErr
-	}
-	defer acquire.Release()
-
-	if acquire == nil {
-		connErr := errors.New(connectError)
-		getErr.message = connErr.Error()
-		return ``, false, &getErr
-	}
+	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
+	//if err != nil {
+	//	getErr.message = err.Error()
+	//	return ``, false, &getErr
+	//}
+	//defer acquire.Release()
+	//
+	//if acquire == nil {
+	//	connErr := errors.New(connectError)
+	//	getErr.message = connErr.Error()
+	//	return ``, false, &getErr
+	//}
 
 	var URL string
 	var isDeleted bool
 
-	query := selectRow
-	row := acquire.QueryRow(ctx, query, requestID)
+	row := dbs.ConnectionPool.QueryRow(ctx, selectRow, requestID)
 
-	err = row.Scan(&URL, &isDeleted)
+	err := row.Scan(&URL, &isDeleted)
 	if err != nil {
 		getErr.message = fmt.Sprintf(`Error: %v, ID: %s`,
 			err, requestID)
@@ -214,14 +209,14 @@ func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink st
 		parentFuncName: `-`,
 	}
 
-	acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	if err != nil {
-		errSet.message = `cant acquire connection`
-		return fmt.Errorf(errSet.Error()+`: %w`, err)
-	}
-	defer acquire.Release()
+	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
+	//if err != nil {
+	//	errSet.message = `cant acquire connection`
+	//	return fmt.Errorf(errSet.Error()+`: %w`, err)
+	//}
+	//defer acquire.Release()
 
-	_, err = acquire.Exec(ctx, insertLinkRow, originalLink, shortLink, hashLink, userID)
+	_, err := dbs.ConnectionPool.Exec(ctx, insertLinkRow, originalLink, shortLink, hashLink, userID)
 
 	if err != nil {
 		errSet.message = `cannot insert row`
@@ -276,28 +271,26 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 		return nil, &errBatchSet
 	}
 
-	acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	if err != nil {
-		errBatchSet.message = "cannot acquire connection"
-		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
-	}
-	defer acquire.Release()
+	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
+	//if err != nil {
+	//	errBatchSet.message = "cannot acquire connection"
+	//	return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
+	//}
+	//defer acquire.Release()
 
 	var batch pgx.Batch
 	for _, v := range savingData {
 		batch.Queue(insertLinkRowBatch, v.OriginalLink, v.ShortLink, v.CorrelationID, userID)
 	}
-	br := acquire.SendBatch(ctx, &batch)
-	defer func(br pgx.BatchResults) {
-		err = br.Close()
-	}(br)
+	br := dbs.ConnectionPool.SendBatch(ctx, &batch)
 
+	_, errPg := br.Exec()
+
+	err = br.Close()
 	if err != nil {
 		errBatchSet.message = "cannot close batch"
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
-
-	_, errPg := br.Exec()
 
 	JSONResp, err := json.Marshal(outputData)
 
@@ -336,14 +329,14 @@ func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, e
 		return nil, &errHandleUserUrls
 	}
 
-	acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	if err != nil {
-		errHandleUserUrls.message = "cannot acquire connection"
-		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
-	}
-	defer acquire.Release()
+	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
+	//if err != nil {
+	//	errHandleUserUrls.message = "cannot acquire connection"
+	//	return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
+	//}
+	//defer acquire.Release()
 
-	rows, err := acquire.Query(ctx, selectAllRows, userID)
+	rows, err := dbs.ConnectionPool.Query(ctx, selectAllRows, userID)
 	if err != nil {
 		errHandleUserUrls.message = "select error"
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
@@ -469,32 +462,30 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) erro
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 
-	acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	if err != nil {
-		errBatchUpdate.message = `acquire error`
-		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
-	}
-	defer acquire.Release()
+	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
+	//if err != nil {
+	//	errBatchUpdate.message = `acquire error`
+	//	return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
+	//}
+	//defer acquire.Release()
 
 	var batch pgx.Batch
 	for _, uid := range data {
 		batch.Queue(updateRowNoUser, uid)
 	}
 
-	br := acquire.SendBatch(ctx, &batch)
-	defer func(br pgx.BatchResults) {
-		err = br.Close()
-	}(br)
-
-	if err != nil {
-		errBatchUpdate.message = "cannot close batch"
-		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
-	}
+	br := dbs.ConnectionPool.SendBatch(ctx, &batch)
 
 	_, err = br.Exec()
 
 	if err != nil {
 		errBatchUpdate.message = `batch update error`
+		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
+	}
+
+	err = br.Close()
+	if err != nil {
+		errBatchUpdate.message = "cannot close batch"
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
 

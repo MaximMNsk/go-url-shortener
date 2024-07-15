@@ -2,12 +2,13 @@ package files
 
 import (
 	"context"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var Store FileStorage
@@ -296,6 +297,7 @@ func TestFileStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestFileStorage_Destroy(_ *testing.T) {
-	Store.Destroy()
+func TestFileStorage_Destroy(t *testing.T) {
+	err := Store.Destroy()
+	require.NoError(t, err)
 }

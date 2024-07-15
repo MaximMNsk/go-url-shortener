@@ -3,6 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/MaximMNsk/go-url-shortener/internal/models/interface/models/mocks"
 	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
 	random "github.com/MaximMNsk/go-url-shortener/internal/util/rand"
@@ -11,12 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
 )
 
 var Serv Server
@@ -67,7 +68,7 @@ func TestErrorDB_Error(t *testing.T) {
 	}
 }
 
-func TestChooseStorage(t *testing.T) {
+func TestServer_ChooseStorage(t *testing.T) {
 	type args struct{}
 	type want struct{}
 
@@ -85,11 +86,20 @@ func TestChooseStorage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Cfg.InitConfig(true)
+			storageMock := mocks.NewStorable(t)
+			storageMock.
+				On(`AsyncSaver`, mock.Anything, mock.Anything).Return().
+				On(`Init`).Return(nil)
+			Serv.Storage = storageMock
+			err := Serv.Storage.Init()
+			require.NoError(t, err)
+			Serv.Storage.AsyncSaver()
+
+			err = Cfg.InitConfig(true)
 			require.NoError(t, err)
 			err = Cfg.InitConfig(false)
 			require.NoError(t, err)
-			_, err = ChooseStorage(context.Background(), Cfg)
+			err = Serv.ChooseStorage(context.Background(), Cfg)
 			require.NoError(t, err)
 		})
 	}
@@ -115,7 +125,8 @@ func TestServer_Init(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := Cfg.InitConfig(true)
 			require.NoError(t, err)
-			err = Serv.Init(Cfg, false)
+
+			err = Serv.Init(context.Background(), Cfg, false)
 			require.NoError(t, err)
 		})
 	}
@@ -140,7 +151,7 @@ func TestServer_Start(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			go func() {
-				err := Serv.Start(context.Background())
+				err := Serv.Start()
 				require.NoError(t, err)
 			}()
 		})
@@ -218,12 +229,17 @@ func TestServer_Stop(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			go func() {
-				// Дождемся реального запуска
-				time.Sleep(200 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 
-				err := Serv.Stop(context.Background())
+				storageMock := mocks.NewStorable(t)
+				storageMock.
+					On(`Destroy`).Return(nil)
+				Serv.Storage = storageMock
+				err := Serv.Storage.Destroy()
+				require.NoError(t, err)
+
+				err = Serv.Stop(context.Background())
 				require.NoError(t, err)
 			}()
 		})
@@ -289,6 +305,17 @@ func TestServer_HandlePOST(t *testing.T) {
 		want want
 	}{
 		{
+			name: `Test Set error`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				link:   ``,
+			},
+			want: want{
+				resp: http.StatusBadRequest,
+			},
+		},
+		{
 			name: `Test Set`,
 			args: args{
 				addr:   Cfg.Final.AppAddr,
@@ -303,11 +330,13 @@ func TestServer_HandlePOST(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			storageMock := mocks.NewStorable(t)
-			storageMock.
-				On(`Set`, mock.Anything, tt.args.link, mock.Anything, mock.Anything, mock.Anything).
-				Return(nil)
-			Serv.Storage = storageMock
+			if tt.name != `Test Set error` {
+				storageMock := mocks.NewStorable(t)
+				storageMock.
+					On(`Set`, mock.Anything, tt.args.link, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+				Serv.Storage = storageMock
+			}
 			resp := httptest.NewRecorder()
 
 			Link = tt.args.link
@@ -401,6 +430,30 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 				links: `{"correlation_id": "abcabc","short_url": "` + `http://` + Cfg.Final.AppAddr + `"}`,
 			},
 		},
+		{
+			name: `Test Batch accept compressed`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				links:  `{"correlation_id": "abcabc","original_url": "http://ya.ru"}`,
+			},
+			want: want{
+				resp:  http.StatusCreated,
+				links: `{"correlation_id": "abcabc","short_url": "` + `http://` + Cfg.Final.AppAddr + `"}`,
+			},
+		},
+		{
+			name: `Test Batch content compressed`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				links:  `{"correlation_id": "abcabc","original_url": "http://ya.ru"}`,
+			},
+			want: want{
+				resp:  http.StatusCreated,
+				links: `{"correlation_id": "abcabc","short_url": "` + `http://` + Cfg.Final.AppAddr + `"}`,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -422,14 +475,23 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 			)
 			require.NoError(t, err)
 
+			if tt.name == "Test Batch accept compressed" {
+				request.Header.Set(`Accept-Encoding`, `gzip`)
+			}
+			if tt.name == "Test Batch content compressed" {
+				request.Header.Set(`Content-Encoding`, `gzip`)
+			}
+
 			Serv.HandleAPIBatch(resp, request)
 			assert.Equal(t, tt.want.resp, resp.Code)
 
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			originalLinks := string(body)
-			assert.Equal(t, tt.want.links, originalLinks)
+			if tt.name != "Test Batch content compressed" {
+				originalLinks := string(body)
+				assert.Equal(t, tt.want.links, originalLinks)
+			}
 		})
 	}
 }
@@ -581,7 +643,7 @@ func TestServer_HandleAPIUserUrlsDelete(t *testing.T) {
 }
 
 func ExampleServer_Init() {
-	err := Serv.Init(Cfg, false)
+	err := Serv.Init(context.Background(), Cfg, false)
 	if err != nil {
 		fmt.Printf("serv init err:%v\n", err)
 	}
@@ -589,7 +651,7 @@ func ExampleServer_Init() {
 
 func ExampleServer_Start() {
 	go func() {
-		err := Serv.Start(context.Background())
+		err := Serv.Start()
 		if err != nil {
 			fmt.Printf("serv start err:%v\n", err)
 		}

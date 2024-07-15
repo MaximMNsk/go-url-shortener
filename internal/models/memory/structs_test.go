@@ -2,11 +2,12 @@ package memory
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 var Store MemStorage
@@ -290,6 +291,7 @@ func TestMemStorage_AsyncSaver(t *testing.T) {
 	}
 }
 
-func TestMemStorage_Destroy(_ *testing.T) {
-	Store.Destroy()
+func TestMemStorage_Destroy(t *testing.T) {
+	err := Store.Destroy()
+	require.NoError(t, err)
 }

@@ -42,8 +42,9 @@ func (ms *MemStorage) Init() error {
 }
 
 // Destroy - метод утилизирует объект для работы с хранилищем.
-func (ms *MemStorage) Destroy() {
+func (ms *MemStorage) Destroy() error {
 	ms.Storage.Clear()
+	return nil
 }
 
 // Ping - метод для проверки работоспособности хранилища.

@@ -3,14 +3,16 @@ package database
 import (
 	"context"
 	"encoding/json"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
-)
 
-var Store DBStorage
+	"github.com/MaximMNsk/go-url-shortener/server/config"
+	_ "github.com/golang/mock/gomock"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/pashagolub/pgxmock/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestDBStorage_Init(t *testing.T) {
 
@@ -38,13 +40,13 @@ func TestDBStorage_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var storage DBStorage
 			var cfg config.OuterConfig
 			ConfErr := cfg.InitConfig(true)
 			require.NoError(t, ConfErr)
-			Store.Cfg = cfg
-			//Store.ConnectionPool, _ = pgxmock.NewPool()
+			storage.Cfg = cfg
 
-			err := Store.Init()
+			err := storage.Init()
 			require.Error(t, err, tt.want.DBErr.Error())
 			if err != nil {
 				t.Skip(`connection refused`)
@@ -162,20 +164,21 @@ func TestDBStorage_Ping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ping, err := Store.Ping(context.Background())
-			require.Equal(t, false, ping)
-			require.Error(t, err, tt.want.DBErr)
-			if err != nil {
-				t.Skip(`connection refused`)
-			}
+			mockPool, err := pgxmock.NewPool()
+			defer mockPool.Close()
+			storage := &DBStorage{ConnectionPool: mockPool}
+			mockPool.ExpectPing().WillReturnError(nil)
+
+			ping, err := storage.Ping(context.Background())
+			require.Equal(t, true, ping)
+			require.NoError(t, err)
 		})
 	}
 }
 
 func TestDBStorage_Set(t *testing.T) {
 	type want struct {
-		ToDelete chan DeleteItem
-		DBErr    DBError
+		DBErr DBError
 	}
 	tests := []struct {
 		name string
@@ -184,12 +187,11 @@ func TestDBStorage_Set(t *testing.T) {
 		{
 			name: `Test Set`,
 			want: want{
-				ToDelete: make(chan DeleteItem),
 				DBErr: DBError{
 					layer:          layer,
 					parentFuncName: ``,
 					funcName:       `Set`,
-					message:        `Connection pool is nil`,
+					message:        ``,
 				},
 			},
 		},
@@ -197,16 +199,22 @@ func TestDBStorage_Set(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Store.Set(context.Background(), ``, ``, ``, 0)
-			require.Error(t, err, tt.want.DBErr)
+			mockPool, err := pgxmock.NewPool()
+			defer mockPool.Close()
+			storage := DBStorage{ConnectionPool: mockPool}
+
+			commandTag := pgconn.NewCommandTag("INSERT 0 1")
+			mockPool.
+				ExpectExec(`insert into public.short_links`).WithArgs(`ya.ru`, `http://localhost:8080/123`, `123`, 0).WillReturnResult(commandTag)
+
+			err = storage.Set(context.Background(), `ya.ru`, `http://localhost:8080/123`, `123`, 0)
+			require.NoError(t, err)
 		})
 	}
 }
 
 func TestDBStorage_Get(t *testing.T) {
 	type want struct {
-		ToDelete  chan DeleteItem
-		DBErr     DBError
 		data      string
 		isDeleted bool
 	}
@@ -222,14 +230,7 @@ func TestDBStorage_Get(t *testing.T) {
 			name: `Test Get`,
 			args: args{link: `asdasd`},
 			want: want{
-				ToDelete: make(chan DeleteItem),
-				DBErr: DBError{
-					layer:          layer,
-					parentFuncName: ``,
-					funcName:       `Get`,
-					message:        `Connection pool is nil`,
-				},
-				data:      ``,
+				data:      `ya.ru`,
 				isDeleted: false,
 			},
 		},
@@ -237,8 +238,16 @@ func TestDBStorage_Get(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, isDeleted, err := Store.Get(context.Background(), tt.args.link)
-			require.Error(t, err, tt.want.DBErr)
+			mockPool, err := pgxmock.NewPool()
+			defer mockPool.Close()
+			storage := &DBStorage{ConnectionPool: mockPool}
+
+			rows := mockPool.NewRows([]string{"original_url", "is_deleted"}).
+				AddRow(tt.want.data, false)
+			mockPool.ExpectQuery(`select original_url, is_deleted from public.short_links`).WithArgs(tt.args.link).WillReturnRows(rows)
+
+			data, isDeleted, err := storage.Get(context.Background(), tt.args.link)
+			require.NoError(t, err)
 			require.Equal(t, data, tt.want.data)
 			require.Equal(t, isDeleted, tt.want.isDeleted)
 		})
@@ -246,18 +255,47 @@ func TestDBStorage_Get(t *testing.T) {
 }
 
 func TestDBStorage_AsyncSaver(t *testing.T) {
+	cfg := config.OuterConfig{}
+	err := cfg.InitConfig(true)
+	require.NoError(t, err)
+
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mockPool.Close()
+
+	storage := DBStorage{
+		ToDeleteCh:       make(chan DeleteItem),
+		AsyncSaverStatCh: make(chan DBError),
+		Cfg:              cfg,
+		ConnectionPool:   mockPool,
+	}
+	//err = storage.Init()
+	//require.NoError(t, err)
+	// TODO BatchSet
+
 	go func() {
-		Store.AsyncSaver()
+		storage.AsyncSaver()
 	}()
 
 	select {
 	case <-time.After(time.Millisecond * 100):
-	case dataErr, ok := <-Store.AsyncSaverStatCh:
+	case dataErr, ok := <-storage.AsyncSaverStatCh:
 		require.Error(t, &dataErr)
 		require.True(t, ok)
 	}
 }
 
-func TestDBStorage_Destroy(_ *testing.T) {
-	Store.Destroy()
+func TestDBStorage_Destroy(t *testing.T) {
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mockPool.Close()
+
+	storage := DBStorage{
+		ConnectionPool: mockPool,
+	}
+
+	mockPool.ExpectClose().WillReturnError(nil)
+
+	err = storage.Destroy()
+	require.NoError(t, err)
 }

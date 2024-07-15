@@ -2,16 +2,17 @@ package main
 
 import (
 	"context"
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/MaximMNsk/go-url-shortener/server/server"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/server"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_Main(t *testing.T) {
@@ -64,9 +65,9 @@ func Test_Main(t *testing.T) {
 	var config confModule.OuterConfig
 	CongErr := config.InitConfig(true)
 	var serve server.Server
-	servErr := serve.Init(config, false)
+	servErr := serve.Init(ctx, config, false)
 	go func() {
-		err := serve.Start(ctx)
+		err := serve.Start()
 		require.NoError(t, err)
 	}()
 

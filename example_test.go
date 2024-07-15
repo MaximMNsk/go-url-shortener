@@ -3,14 +3,15 @@ package go_url_shortener_test
 import (
 	"context"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
-	"github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/MaximMNsk/go-url-shortener/server/server"
-	"github.com/carlmjohnson/requests"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/hash/sha1hash"
+	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/server"
+	"github.com/carlmjohnson/requests"
 )
 
 // HttpClient - структура объекта клиента
@@ -50,12 +51,12 @@ func Example() {
 
 	// Запускаем сервер.
 	var serv server.Server
-	err = serv.Init(conf, false)
+	err = serv.Init(ctx, conf, false)
 	if err != nil {
 		fmt.Println(`Server init error: `, err.Error())
 	}
 	go func() {
-		err = serv.Start(ctx)
+		err = serv.Start()
 		if err != nil {
 			fmt.Println(`Starting error: `, err.Error())
 		}
