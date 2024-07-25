@@ -207,9 +207,16 @@ func TestDBStorage_Set(t *testing.T) {
 
 			commandTag := pgconn.NewCommandTag("INSERT 0 1")
 			mockPool.
-				ExpectExec(`insert into public.short_links`).WithArgs(`ya.ru`, `http://localhost:8080/123`, `123`, 0).WillReturnResult(commandTag)
+				ExpectExec(`insert into public.short_links`).
+				WithArgs(`ya.ru`, `http://localhost:8080/123`, `123`, 0).
+				WillReturnResult(commandTag)
 
-			err = storage.Set(context.Background(), `ya.ru`, `http://localhost:8080/123`, `123`, 0)
+			err = storage.Set(
+				context.Background(),
+				`ya.ru`,
+				`http://localhost:8080/123`,
+				`123`,
+				0)
 			require.NoError(t, err)
 		})
 	}
@@ -257,7 +264,7 @@ func TestDBStorage_Get(t *testing.T) {
 	}
 }
 
-func TestDBStorage_AsyncSaver(t *testing.T) {
+func TestDBStorage_BatchSet(t *testing.T) {
 	cfg := config.OuterConfig{}
 	err := cfg.InitConfig(true)
 	require.NoError(t, err)
@@ -272,18 +279,116 @@ func TestDBStorage_AsyncSaver(t *testing.T) {
 		Cfg:              cfg,
 		ConnectionPool:   mockPool,
 	}
-	//err = storage.Init()
-	//require.NoError(t, err)
-	// TODO BatchSet
+
+	commandTag := pgconn.NewCommandTag("INSERT 0 1")
+	mockPool.
+		ExpectBatch().
+		ExpectExec(`insert into public.short_links `).
+		WithArgs(`ya.ru`, `http://localhost:8080/123`, `123`, 0).
+		WillReturnResult(commandTag)
+
+	data := []byte(`[{"correlation_id": "123", "original_url": "ya.ru"}]`)
+	set, err := storage.BatchSet(context.Background(), data, 0)
+
+	res := []byte(`[{"correlation_id":"123","short_url":"http://localhost:8080/123"}]`)
+
+	require.NoError(t, err)
+	require.Equal(t, res, set)
+}
+
+func TestDBStorage_BatchUpdate(t *testing.T) {
+	cfg := config.OuterConfig{}
+	err := cfg.InitConfig(true)
+	require.NoError(t, err)
+
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mockPool.Close()
+
+	storage := DBStorage{
+		ToDeleteCh:       make(chan DeleteItem),
+		AsyncSaverStatCh: make(chan DBError),
+		Cfg:              cfg,
+		ConnectionPool:   mockPool,
+	}
+
+	commandTag := pgconn.NewCommandTag("INSERT 0 1")
+	mockPool.
+		ExpectBatch().
+		ExpectExec(`update public.short_links set is_deleted = true where uid`).
+		WithArgs(`asd`).
+		WillReturnResult(commandTag)
+	err = storage.BatchUpdate(context.Background(), `["asd"]`, 0)
+	require.NoError(t, err)
+}
+
+func TestDBStorage_HandleUserUrls(t *testing.T) {
+	cfg := config.OuterConfig{}
+	err := cfg.InitConfig(true)
+	require.NoError(t, err)
+
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mockPool.Close()
+
+	storage := DBStorage{
+		ToDeleteCh:       make(chan DeleteItem),
+		AsyncSaverStatCh: make(chan DBError),
+		Cfg:              cfg,
+		ConnectionPool:   mockPool,
+	}
+
+	rows := mockPool.NewRows([]string{"original_url", "short_url"}).
+		AddRow(`ya.ru`, `http://localhost:8080/123`)
+	mockPool.
+		ExpectQuery(`select original_url, short_url from public.short_links`).
+		WithArgs(0).WillReturnRows(rows)
+
+	res, err := storage.HandleUserUrls(context.Background(), 0)
+	require.NoError(t, err)
+	require.Equal(t, res, []byte(`[{"original_url":"ya.ru","short_url":"http://localhost:8080/123"}]`))
+}
+
+func TestDBStorage_HandleUserUrlsDelete(t *testing.T) {
+
+}
+
+func TestDBStorage_AsyncSaver(t *testing.T) {
+	cfg := config.OuterConfig{}
+	err := cfg.InitConfig(true)
+	require.NoError(t, err)
+
+	mockPool, err := pgxmock.NewPool()
+	require.NoError(t, err)
+	defer mockPool.Close()
+
+	commandTag := pgconn.NewCommandTag("INSERT 0 1")
+	mockPool.
+		ExpectBatch().
+		ExpectExec(`update public.short_links set is_deleted = true where uid`).
+		WithArgs(`6qxTVvsy`).
+		WillReturnResult(commandTag)
+
+	storage := DBStorage{
+		ToDeleteCh:       make(chan DeleteItem),
+		AsyncSaverStatCh: make(chan DBError),
+		Cfg:              cfg,
+		ConnectionPool:   mockPool,
+	}
 
 	go func() {
 		storage.AsyncSaver()
 	}()
 
+	storage.ToDeleteCh <- DeleteItem{
+		URLs:   `["6qxTVvsy"]`,
+		UserID: 0,
+	}
+
 	select {
 	case <-time.After(time.Millisecond * 100):
 	case dataErr, ok := <-storage.AsyncSaverStatCh:
-		require.Error(t, &dataErr)
+		require.NoError(t, &dataErr)
 		require.True(t, ok)
 	}
 }

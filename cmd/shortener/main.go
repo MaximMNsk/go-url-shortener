@@ -14,7 +14,7 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/server"
 )
 
-// go build -ldflags "-X main.buildVersion=1.20 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=Iter20" main.go
+// go build -ldflags "-X main.buildVersion=1.21 -X 'main.buildDate=$(date +'%Y/%m/%d %H:%M:%S')' -X main.buildCommit=Iter21" main.go
 var (
 	buildVersion string
 	buildDate    string

@@ -272,7 +272,7 @@ func (s *Server) HandleAPIBatch(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var batchErr *pgconn.PgError
 		if errors.As(err, &batchErr) {
-			if batchErr.Code == `23505` {
+			if batchErr.Code == pgerrcode.UniqueViolation {
 				httpResp.ConflictJSON(res, additional)
 				return
 			}
@@ -335,7 +335,7 @@ func (s *Server) HandleAPIShorten(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
-			if pgErr.Code == `23505` {
+			if pgErr.Code == pgerrcode.UniqueViolation {
 				logger.PrintLog(logger.WARN, "Can not set link data: "+err.Error(), s.LogEnabled)
 				httpResp.ConflictJSON(res, additional)
 				return
@@ -377,6 +377,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		logger.PrintLog(logger.ERROR, handlePingErr.Error()+`: `+err.Error(), s.LogEnabled)
 	}
+	httpResp.BadRequest(res)
 }
 
 // HandleOther - middleware для обработки неожидаемых запросов.

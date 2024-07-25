@@ -73,7 +73,6 @@ const insertLinkRow = `
 insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const insertLinkRowBatch = `
-
 insert into public.short_links (original_url, short_url, uid, user_id) values ($1, $2, $3, $4)`
 
 const selectRow = `
@@ -161,19 +160,6 @@ func (dbs *DBStorage) Get(ctx context.Context, requestID string) (string, bool, 
 		message:        `Error occurred`,
 	}
 
-	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	//if err != nil {
-	//	getErr.message = err.Error()
-	//	return ``, false, &getErr
-	//}
-	//defer acquire.Release()
-	//
-	//if acquire == nil {
-	//	connErr := errors.New(connectError)
-	//	getErr.message = connErr.Error()
-	//	return ``, false, &getErr
-	//}
-
 	var URL string
 	var isDeleted bool
 
@@ -208,13 +194,6 @@ func (dbs *DBStorage) Set(ctx context.Context, originalLink string, shortLink st
 		funcName:       `Set`,
 		parentFuncName: `-`,
 	}
-
-	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	//if err != nil {
-	//	errSet.message = `cant acquire connection`
-	//	return fmt.Errorf(errSet.Error()+`: %w`, err)
-	//}
-	//defer acquire.Release()
 
 	_, err := dbs.ConnectionPool.Exec(ctx, insertLinkRow, originalLink, shortLink, hashLink, userID)
 
@@ -271,13 +250,6 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 		return nil, &errBatchSet
 	}
 
-	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	//if err != nil {
-	//	errBatchSet.message = "cannot acquire connection"
-	//	return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
-	//}
-	//defer acquire.Release()
-
 	var batch pgx.Batch
 	for _, v := range savingData {
 		batch.Queue(insertLinkRowBatch, v.OriginalLink, v.ShortLink, v.CorrelationID, userID)
@@ -328,13 +300,6 @@ func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, e
 		errHandleUserUrls.message = connectError
 		return nil, &errHandleUserUrls
 	}
-
-	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	//if err != nil {
-	//	errHandleUserUrls.message = "cannot acquire connection"
-	//	return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
-	//}
-	//defer acquire.Release()
 
 	rows, err := dbs.ConnectionPool.Query(ctx, selectAllRows, userID)
 	if err != nil {
@@ -411,7 +376,7 @@ func (dbs *DBStorage) AsyncSaver() {
 			}
 			err := dbs.BatchUpdate(context.Background(), data.URLs, data.UserID)
 			if err != nil {
-				errHandleUserUrlsDelete.message = `update error`
+				errHandleUserUrlsDelete.message = err.Error()
 				dbs.AsyncSaverStatCh <- errHandleUserUrlsDelete
 				continue
 			}

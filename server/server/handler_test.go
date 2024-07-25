@@ -15,6 +15,8 @@ import (
 	random "github.com/MaximMNsk/go-url-shortener/internal/util/rand"
 	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -69,18 +71,19 @@ func TestErrorDB_Error(t *testing.T) {
 }
 
 func TestServer_ChooseStorage(t *testing.T) {
-	type args struct{}
-	type want struct{}
+
+	type args struct {
+		testMode bool
+	}
+	type want struct {
+		err error
+	}
 
 	tests := []struct {
 		name string
-		args args
-		want want
 	}{
 		{
 			name: `Test ChooseStorage`,
-			args: args{},
-			want: want{},
 		},
 	}
 
@@ -96,6 +99,8 @@ func TestServer_ChooseStorage(t *testing.T) {
 			Serv.Storage.AsyncSaver()
 
 			err = Cfg.InitConfig(true)
+			require.NoError(t, err)
+			err = Serv.ChooseStorage(context.Background(), Cfg)
 			require.NoError(t, err)
 			err = Cfg.InitConfig(false)
 			require.NoError(t, err)
@@ -229,6 +234,7 @@ func TestServer_Stop(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var errCh = make(chan error)
 			go func() {
 				time.Sleep(100 * time.Millisecond)
 
@@ -236,23 +242,36 @@ func TestServer_Stop(t *testing.T) {
 				storageMock.
 					On(`Destroy`).Return(nil)
 				Serv.Storage = storageMock
-				err := Serv.Storage.Destroy()
-				require.NoError(t, err)
+				errCh <- Serv.Storage.Destroy()
 
-				err = Serv.Stop(context.Background())
-				require.NoError(t, err)
+				errCh <- Serv.Stop(context.Background())
 			}()
+
+			time.Sleep(100 * time.Millisecond)
+			select {
+			case res, ok := <-errCh:
+				if !ok {
+					t.Error(`Reading error`)
+					return
+				}
+				require.NoError(t, res)
+			default:
+				time.Sleep(100 * time.Millisecond)
+			}
 		})
 	}
 }
 
 func TestServer_HandlePing(t *testing.T) {
 	type args struct {
-		addr   string
-		method string
+		addr       string
+		method     string
+		pingResult bool
+		pingError  error
 	}
 	type want struct {
 		resp int
+		err  error
 	}
 
 	tests := []struct {
@@ -263,11 +282,26 @@ func TestServer_HandlePing(t *testing.T) {
 		{
 			name: `Test Ping`,
 			args: args{
-				addr:   Cfg.Final.AppAddr + `/ping`,
-				method: http.MethodGet,
+				addr:       Cfg.Final.AppAddr + `/ping`,
+				method:     http.MethodGet,
+				pingResult: true,
+				pingError:  nil,
 			},
 			want: want{
 				resp: http.StatusOK,
+				err:  nil,
+			},
+		},
+		{
+			name: `Test Ping Error`,
+			args: args{
+				addr:       Cfg.Final.AppAddr + `/ping`,
+				method:     http.MethodGet,
+				pingResult: false,
+				pingError:  nil,
+			},
+			want: want{
+				resp: http.StatusBadRequest,
 			},
 		},
 	}
@@ -276,7 +310,7 @@ func TestServer_HandlePing(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			storageMock := mocks.NewStorable(t)
 			storageMock.
-				On(`Ping`, mock.Anything).Return(true, nil)
+				On(`Ping`, mock.Anything).Return(tt.args.pingResult, tt.args.pingError)
 			Serv.Storage = storageMock
 			resp := httptest.NewRecorder()
 
@@ -326,17 +360,35 @@ func TestServer_HandlePOST(t *testing.T) {
 				resp: http.StatusCreated,
 			},
 		},
+		{
+			name: `Test Set duplicate`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				link:   random.StringBytes(10),
+			},
+			want: want{
+				resp: http.StatusConflict,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.name != `Test Set error` {
-				storageMock := mocks.NewStorable(t)
+			storageMock := mocks.NewStorable(t)
+			if tt.name == `Test Set` {
 				storageMock.
 					On(`Set`, mock.Anything, tt.args.link, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
-				Serv.Storage = storageMock
 			}
+			if tt.name == `Test Set duplicate` {
+				var pgErrType pgconn.PgError
+				pgErrType.Code = pgerrcode.UniqueViolation
+				storageMock.
+					On(`Set`, mock.Anything, tt.args.link, mock.Anything, mock.Anything, mock.Anything).
+					Return(&pgErrType)
+			}
+			Serv.Storage = storageMock
 			resp := httptest.NewRecorder()
 
 			Link = tt.args.link
@@ -377,6 +429,30 @@ func TestServer_HandleGET(t *testing.T) {
 				link: Link,
 			},
 		},
+		{
+			name: `Test Get Bad`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodGet,
+				link:   ``,
+			},
+			want: want{
+				resp: http.StatusBadRequest,
+				link: Link,
+			},
+		},
+		{
+			name: `Test Get Deleted`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodGet,
+				link:   Link,
+			},
+			want: want{
+				resp: http.StatusGone,
+				link: Link,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -384,9 +460,23 @@ func TestServer_HandleGET(t *testing.T) {
 			shortLinkID := sha1hash.Create(tt.args.link, 8)
 
 			storageMock := mocks.NewStorable(t)
-			storageMock.
-				On(`Get`, mock.Anything, shortLinkID).
-				Return(tt.args.link, false, nil)
+
+			if tt.name == `Test Get` {
+				storageMock.
+					On(`Get`, mock.Anything, shortLinkID).
+					Return(tt.args.link, false, nil)
+			}
+			if tt.name == `Test Get Bad` {
+				storageMock.
+					On(`Get`, mock.Anything, shortLinkID).
+					Return(tt.args.link, false, nil)
+			}
+			if tt.name == `Test Get Deleted` {
+				storageMock.
+					On(`Get`, mock.Anything, shortLinkID).
+					Return(tt.args.link, true, nil)
+			}
+
 			Serv.Storage = storageMock
 			resp := httptest.NewRecorder()
 
@@ -396,8 +486,10 @@ func TestServer_HandleGET(t *testing.T) {
 			Serv.HandleGET(resp, request)
 			assert.Equal(t, tt.want.resp, resp.Code)
 
-			originalLink := resp.Header().Get(`Location`)
-			assert.Equal(t, tt.want.link, originalLink)
+			if tt.name == `Test Get` {
+				originalLink := resp.Header().Get(`Location`)
+				assert.Equal(t, tt.want.link, originalLink)
+			}
 		})
 	}
 }
@@ -443,14 +535,14 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 			},
 		},
 		{
-			name: `Test Batch content compressed`,
+			name: `Test Batch Unique Constraint`,
 			args: args{
 				addr:   Cfg.Final.AppAddr,
 				method: http.MethodPost,
 				links:  `{"correlation_id": "abcabc","original_url": "http://ya.ru"}`,
 			},
 			want: want{
-				resp:  http.StatusCreated,
+				resp:  http.StatusConflict,
 				links: `{"correlation_id": "abcabc","short_url": "` + `http://` + Cfg.Final.AppAddr + `"}`,
 			},
 		},
@@ -459,9 +551,19 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storageMock := mocks.NewStorable(t)
-			storageMock.
-				On(`BatchSet`, mock.Anything, []byte(tt.args.links), 0).
-				Return([]byte(tt.want.links), nil)
+
+			if tt.name == `Test Batch Unique Constraint` {
+				var batchErr pgconn.PgError
+				batchErr.Code = pgerrcode.UniqueViolation
+				storageMock.
+					On(`BatchSet`, mock.Anything, []byte(tt.args.links), 0).
+					Return([]byte(tt.want.links), &batchErr)
+			} else {
+				storageMock.
+					On(`BatchSet`, mock.Anything, []byte(tt.args.links), 0).
+					Return([]byte(tt.want.links), nil)
+			}
+
 			Serv.Storage = storageMock
 			resp := httptest.NewRecorder()
 
@@ -478,9 +580,6 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 			if tt.name == "Test Batch accept compressed" {
 				request.Header.Set(`Accept-Encoding`, `gzip`)
 			}
-			if tt.name == "Test Batch content compressed" {
-				request.Header.Set(`Content-Encoding`, `gzip`)
-			}
 
 			Serv.HandleAPIBatch(resp, request)
 			assert.Equal(t, tt.want.resp, resp.Code)
@@ -488,10 +587,8 @@ func TestServer_HandleAPIBatch(t *testing.T) {
 			body, err := io.ReadAll(resp.Body)
 			require.NoError(t, err)
 
-			if tt.name != "Test Batch content compressed" {
-				originalLinks := string(body)
-				assert.Equal(t, tt.want.links, originalLinks)
-			}
+			originalLinks := string(body)
+			assert.Equal(t, tt.want.links, originalLinks)
 		})
 	}
 }
@@ -522,14 +619,36 @@ func TestServer_HandleAPIShorten(t *testing.T) {
 				resp: http.StatusCreated,
 			},
 		},
+		{
+			name: `Test Set API shorten conflict`,
+			args: args{
+				addr:   Cfg.Final.AppAddr,
+				method: http.MethodPost,
+				link:   `{"url":"url"}`,
+			},
+			want: want{
+				resp: http.StatusConflict,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			storageMock := mocks.NewStorable(t)
-			storageMock.
-				On(`Set`, mock.Anything, `url`, mock.Anything, mock.Anything, 0).
-				Return(nil)
+
+			if tt.name == `Test Set API shorten conflict` {
+				var batchErr pgconn.PgError
+				batchErr.Code = pgerrcode.UniqueViolation
+
+				storageMock.
+					On(`Set`, mock.Anything, `url`, mock.Anything, mock.Anything, 0).
+					Return(&batchErr)
+			} else {
+				storageMock.
+					On(`Set`, mock.Anything, `url`, mock.Anything, mock.Anything, 0).
+					Return(nil)
+			}
+
 			Serv.Storage = storageMock
 			resp := httptest.NewRecorder()
 
