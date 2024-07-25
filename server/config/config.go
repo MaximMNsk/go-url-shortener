@@ -1,39 +1,52 @@
+// Package config - пакет для работы с параметрами конфигурации.
 package config
 
 import (
 	"flag"
 	"fmt"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/logger"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
-	"github.com/caarlos0/env/v6"
 	"net"
 	"path/filepath"
 	"strings"
+
+	"github.com/caarlos0/env/v6"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 )
 
-const localHost = "http://localhost"
+const localHost = "localhost"
 const localPort = "8080"
+const secProto = `https://`
+const proto = `http://`
 
+// OuterConfig - структура объекта конфигурации.
 type OuterConfig struct {
 	Default struct {
+		IsSecure bool
+		Cert     struct {
+			KeyFile  string
+			CertFile string
+		}
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
 		DB           string
 	}
 	Env struct {
+		IsSecure     bool   `env:"ENABLE_HTTPS"`
 		AppAddr      string `env:"SERVER_ADDRESS"`
 		ShortURLAddr string `env:"BASE_URL"`
 		LinkFile     string `env:"FILE_STORAGE_PATH"`
 		DB           string `env:"DATABASE_DSN"`
 	}
 	Flag struct {
+		IsSecure     bool
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
 		DB           string
 	}
 	Final struct {
+		IsSecure     bool
 		AppAddr      string
 		ShortURLAddr string
 		LinkFile     string
@@ -41,33 +54,34 @@ type OuterConfig struct {
 	}
 }
 
-var Config OuterConfig
-
-/**
- * Config handlers
- */
-
 // parseFlags обрабатывает аргументы командной строки
-// и сохраняет их значения в соответствующих переменных
-func parseFlags() {
-	flag.StringVar(&Config.Flag.AppAddr, "a", "", "address and port to run server")
-	flag.StringVar(&Config.Flag.ShortURLAddr, "b", "", "address and port to short link")
-	flag.StringVar(&Config.Flag.LinkFile, "f", "", "path to file with links")
-	flag.StringVar(&Config.Flag.DB, "d", "", "db connection")
-
+// и сохраняет их значения в соответствующих переменных.
+func (config *OuterConfig) parseFlags() {
+	flag.StringVar(&config.Flag.AppAddr, "a", "", "address and port to run server")
+	flag.StringVar(&config.Flag.ShortURLAddr, "b", "", "address and port to short link")
+	flag.StringVar(&config.Flag.LinkFile, "f", "", "path to file with links")
+	flag.StringVar(&config.Flag.DB, "d", "", "db connection")
+	flag.BoolVar(&config.Flag.IsSecure, "s", false, "secure connection")
 	flag.Parse()
 }
 
+// handleFinal финализирует подготовку объекта конфигурации.
+// Выполняется после инициализации и получения параметров.
 func (config *OuterConfig) handleFinal() error {
-	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, "http://", "", -1)
+	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, proto, "", -1)
+	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, secProto, "", -1)
 	aHost, aPort, err := net.SplitHostPort(config.Final.AppAddr)
 	if err == nil {
 		if aHost == "" {
 			config.Final.AppAddr = "localhost:" + aPort
 		}
 
-		if config.Final.ShortURLAddr[0:7] != "http://" {
-			config.Final.ShortURLAddr = "http://" + config.Final.ShortURLAddr
+		if config.Final.ShortURLAddr[0:4] != `http` {
+			if config.Final.IsSecure {
+				config.Final.ShortURLAddr = secProto + config.Final.ShortURLAddr
+			} else {
+				config.Final.ShortURLAddr = proto + config.Final.ShortURLAddr
+			}
 		}
 	}
 	config.Final.LinkFile = filepath.Join(config.Final.LinkFile)
@@ -75,59 +89,87 @@ func (config *OuterConfig) handleFinal() error {
 	return err
 }
 
-func setDefaults() {
-	Config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
-	Config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
-	rootPath, _ := pathhandler.ProjectRoot()
-	Config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/files/links.json")
-	Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
+// setDefaults - устанавливает умолчательные значения.
+func (config *OuterConfig) setDefaults() error {
+	config.Default.IsSecure = false
+	config.Default.AppAddr = fmt.Sprintf("%s:%s", localHost, localPort)
+	config.Default.ShortURLAddr = fmt.Sprintf("%s:%s", localHost, localPort)
+	rootPath, err := pathhandler.ProjectRoot()
+	config.Default.Cert.CertFile = filepath.Join(rootPath, "cmd/shortener/secure/certificate.crt")
+	config.Default.Cert.KeyFile = filepath.Join(rootPath, "cmd/shortener/secure/privateKey.key")
+	config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/files/links.json")
+	config.Default.DB = "postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable"
+	//Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
+	return err
 }
 
-func parseEnv() {
-	err := env.Parse(&Config.Env)
+// parseEnv обрабатывает переменные окружения
+// и сохраняет их значения в соответствующих переменных.
+func (config *OuterConfig) parseEnv() error {
+	err := env.Parse(&config.Env)
+	return err
+}
+
+// InitConfig - инициализация объекта конфигурации.
+func (config *OuterConfig) InitConfig(testMode bool) error {
+
+	err := config.setDefaults()
 	if err != nil {
-		logger.PrintLog(logger.ERROR, "Can't parse ENV")
+		return err
 	}
-}
-
-func HandleConfig() (OuterConfig, error) {
-
-	setDefaults()
-	parseEnv()
-	parseFlags()
-
-	if Config.Env.AppAddr != "" {
-		Config.Final.AppAddr = Config.Env.AppAddr
-	} else if Config.Flag.AppAddr != "" {
-		Config.Final.AppAddr = Config.Flag.AppAddr
-	} else {
-		Config.Final.AppAddr = Config.Default.AppAddr
+	if !testMode {
+		err = config.parseEnv()
+		if err != nil {
+			return err
+		}
+		config.parseFlags()
 	}
 
-	if Config.Env.ShortURLAddr != "" {
-		Config.Final.ShortURLAddr = Config.Env.ShortURLAddr
-	} else if Config.Flag.ShortURLAddr != "" {
-		Config.Final.ShortURLAddr = Config.Flag.ShortURLAddr
-	} else {
-		Config.Final.ShortURLAddr = Config.Default.ShortURLAddr
+	switch {
+	case config.Env.IsSecure:
+		config.Final.IsSecure = true
+	case config.Flag.IsSecure:
+		config.Final.IsSecure = true
+	default:
+		config.Final.IsSecure = config.Default.IsSecure
 	}
 
-	if Config.Env.LinkFile != "" {
-		Config.Final.LinkFile = Config.Env.LinkFile
-	} else if Config.Flag.LinkFile != "" {
-		Config.Final.LinkFile = Config.Flag.LinkFile
-	} else {
-		Config.Final.LinkFile = Config.Default.LinkFile
+	switch {
+	case config.Env.AppAddr != "":
+		config.Final.AppAddr = config.Env.AppAddr
+	case config.Flag.AppAddr != "":
+		config.Final.AppAddr = config.Flag.AppAddr
+	default:
+		config.Final.AppAddr = config.Default.AppAddr
 	}
 
-	if Config.Env.DB != "" {
-		Config.Final.DB = Config.Env.DB
-	} else if Config.Flag.DB != "" {
-		Config.Final.DB = Config.Flag.DB
-	} else {
-		Config.Final.DB = Config.Default.DB
+	switch {
+	case config.Env.ShortURLAddr != "":
+		config.Final.ShortURLAddr = config.Env.ShortURLAddr
+	case config.Flag.ShortURLAddr != "":
+		config.Final.ShortURLAddr = config.Flag.ShortURLAddr
+	default:
+		config.Final.ShortURLAddr = config.Default.ShortURLAddr
 	}
 
-	err := Config.handleFinal()
-	return Config, err
+	switch {
+	case config.Env.LinkFile != "":
+		config.Final.LinkFile = config.Env.LinkFile
+	case config.Flag.LinkFile != "":
+		config.Final.LinkFile = config.Flag.LinkFile
+	default:
+		config.Final.LinkFile = config.Default.LinkFile
+	}
+
+	switch {
+	case config.Env.DB != "":
+		config.Final.DB = config.Env.DB
+	case config.Flag.DB != "":
+		config.Final.DB = config.Flag.DB
+	default:
+		config.Final.DB = config.Default.DB
+	}
+
+	err = config.handleFinal()
+	return err
 }

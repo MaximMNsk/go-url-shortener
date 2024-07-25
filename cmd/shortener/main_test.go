@@ -1,18 +1,21 @@
 package main
 
 import (
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
-	"github.com/MaximMNsk/go-url-shortener/server/server"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
+	"github.com/MaximMNsk/go-url-shortener/server/server"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func Test_handleMainPage(t *testing.T) {
+func Test_Main(t *testing.T) {
 	type args struct {
 		path        string
 		method      string
@@ -58,13 +61,21 @@ func Test_handleMainPage(t *testing.T) {
 		},
 	}
 	var shortLink string
-	config, _ := confModule.HandleConfig()
-	storage := server.InitStorage()
-	serve := server.NewServ(config, storage)
+	ctx := context.Background()
+	var config confModule.OuterConfig
+	CongErr := config.InitConfig(true)
+	var serve server.Server
+	servErr := serve.Init(ctx, config, false)
+	go func() {
+		err := serve.Start()
+		require.NoError(t, err)
+	}()
 
 	for _, tt := range tests {
-
+		time.Sleep(100 * time.Millisecond)
 		t.Run(tt.name, func(t *testing.T) {
+			require.NoError(t, CongErr)
+			require.NoError(t, servErr)
 			if tt.name == "Set link" {
 				bodyReader := strings.NewReader(tt.args.testLink)
 				request := httptest.NewRequest(tt.args.method, tt.args.path, bodyReader)
@@ -80,21 +91,15 @@ func Test_handleMainPage(t *testing.T) {
 				require.NoError(t, err)
 				shortLink = string(linkResult)
 				require.NotEmpty(t, shortLink)
-				_ = result.Body.Close()
+				err = result.Body.Close()
+				require.NoError(t, err)
 			}
-
-			//if tt.name == "Get link" {
-			//	request := httptest.NewRequest(tt.args.method, shortLink, nil)
-			//	w := httptest.NewRecorder()
-			//	handleGET(w, request)
-			//
-			//	result := w.Result()
-			//	assert.Equal(t, tt.want.statusCode, result.StatusCode)
-			//	assert.Contains(t, result.Header.Get("Content-Type"), tt.want.contentType)
-			//	assert.Equal(t, tt.want.response, result.Header.Get("Location"))
-			//	_ = result.Body.Close()
-			//}
-
 		})
 	}
+
+	go func() {
+		time.Sleep(2 * time.Second)
+		err := serve.Stop(ctx)
+		require.NoError(t, err)
+	}()
 }
