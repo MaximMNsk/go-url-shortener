@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -515,12 +516,28 @@ func (s *Server) Start() error {
 
 	s.HTTP.Addr = s.Config.Final.AppAddr
 	s.HTTP.Handler = s.Routers
-	err := s.HTTP.ListenAndServe()
-	if err != nil {
-		if errors.Is(err, http.ErrServerClosed) && s.ShutdownProcess {
-			return nil
+
+	if s.Config.Final.IsSecure {
+		serverTLSCert, err := tls.LoadX509KeyPair(s.Config.Default.Cert.CertFile, s.Config.Default.Cert.KeyFile)
+		if err != nil {
+			return fmt.Errorf(`init cert error: %w`, err)
 		}
-		return fmt.Errorf(`can't start http listener: %w`, err)
+		s.HTTP.TLSConfig = &tls.Config{Certificates: []tls.Certificate{serverTLSCert}}
+		err = s.HTTP.ListenAndServeTLS(``, ``)
+		if err != nil {
+			if errors.Is(err, http.ErrServerClosed) && s.ShutdownProcess {
+				return nil
+			}
+			return fmt.Errorf(`can't start https: %w`, err)
+		}
+	} else {
+		err := s.HTTP.ListenAndServe()
+		if err != nil {
+			if errors.Is(err, http.ErrServerClosed) && s.ShutdownProcess {
+				return nil
+			}
+			return fmt.Errorf(`can't start http: %w`, err)
+		}
 	}
 
 	return nil

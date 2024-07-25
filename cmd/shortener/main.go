@@ -72,6 +72,6 @@ func main() {
 	logger.PrintLog(logger.INFO, `Start server`, serv.LogEnabled)
 	err = serv.Start()
 	if err != nil {
-		logger.PrintLog(logger.ERROR, err.Error(), serv.LogEnabled)
+		logger.PrintLog(logger.ERROR, err.Error(), true)
 	}
 }
