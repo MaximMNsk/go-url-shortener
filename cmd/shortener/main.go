@@ -38,7 +38,7 @@ func main() {
 	var conf confModule.OuterConfig
 	err := conf.InitConfig(false)
 	if err != nil {
-		logger.PrintLog(logger.INFO, "Config error", true)
+		logger.PrintLog(logger.INFO, "Config error: "+err.Error(), true)
 		return
 	}
 
