@@ -52,7 +52,7 @@ func main() {
 	}
 
 	exit := make(chan os.Signal, 1)
-	signal.Notify(exit, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGABRT, syscall.SIGINT, syscall.SIGSEGV)
+	signal.Notify(exit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	go func() {
 		for {
 			select {
