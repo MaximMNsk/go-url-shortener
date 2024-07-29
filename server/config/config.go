@@ -79,8 +79,12 @@ func (config *OuterConfig) parseFlags() {
 // handleFinal финализирует подготовку объекта конфигурации.
 // Выполняется после инициализации и получения параметров.
 func (config *OuterConfig) handleFinal() error {
-	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, proto, "", -1)
-	config.Final.AppAddr = strings.Replace(config.Final.AppAddr, secProto, "", -1)
+	r := strings.NewReplacer(
+		proto, "",
+		secProto, "",
+	)
+	config.Final.AppAddr = r.Replace(config.Final.AppAddr)
+
 	aHost, aPort, err := net.SplitHostPort(config.Final.AppAddr)
 	if err != nil {
 		return err

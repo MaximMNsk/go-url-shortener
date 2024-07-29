@@ -30,6 +30,7 @@ func (e *FileError) Error() string {
 
 // layer - слой приложения. Используется для логирования.
 const layer = `File`
+const unmarshalErrorText = `unmarshal error`
 
 // FileStorage - основная структура хранения.
 type FileStorage struct {
@@ -151,7 +152,6 @@ func getData(fileName string) (string, error) {
 func (fs *FileStorage) Set(_ context.Context, originalLink string, shortLink string, hashLink string, _ int) error {
 
 	var toSave []inputOutputData
-	var toLoad []inputOutputData
 
 	errSet := FileError{
 		layer:          layer,
@@ -172,13 +172,13 @@ func (fs *FileStorage) Set(_ context.Context, originalLink string, shortLink str
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	err = json.Unmarshal([]byte(jsonString), &toLoad)
+	err = json.Unmarshal([]byte(jsonString), &toSave)
 	if err != nil {
 		errSet.message = `cannot parse json data`
 		return fmt.Errorf(errSet.Error()+`: %w`, err)
 	}
 
-	toSave = append(toLoad, preparedData)
+	toSave = append(toSave, preparedData)
 	var content []byte
 	content, err = json.Marshal(toSave)
 	if err != nil {
@@ -293,7 +293,7 @@ func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, 
 
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
-		errBatchSet.message = `unmarshal error`
+		errBatchSet.message = unmarshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -316,7 +316,7 @@ func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, 
 	}
 	err = json.Unmarshal([]byte(jsonString), &savedData)
 	if err != nil {
-		errBatchSet.message = `unmarshal error`
+		errBatchSet.message = unmarshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -368,7 +368,7 @@ func (fs *FileStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) 
 
 	err = json.Unmarshal([]byte(jsonString), &savedData)
 	if err != nil {
-		errHandleUserUrls.message = `unmarshal error`
+		errHandleUserUrls.message = unmarshalErrorText
 		return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 	}
 
