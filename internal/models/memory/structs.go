@@ -26,6 +26,8 @@ func (e *MemError) Error() string {
 }
 
 const layer = `Memory`
+const unmarshalErrorText = `unmarshal error`
+const marshalErrorText = `marshal error`
 
 // MemStorage - основная структура хранения.
 type MemStorage struct {
@@ -137,7 +139,7 @@ func (ms *MemStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, e
 
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
-		errBatchSet.message = `unmarshal error`
+		errBatchSet.message = unmarshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -156,7 +158,7 @@ func (ms *MemStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, e
 
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
-		errBatchSet.message = `marshal error`
+		errBatchSet.message = marshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -190,7 +192,7 @@ func (ms *MemStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) {
 		}
 		JSONResp, err := json.Marshal(batchResp)
 		if err != nil {
-			errHandleUserUrls.message = `marshal error`
+			errHandleUserUrls.message = marshalErrorText
 			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 		}
 		return JSONResp, nil

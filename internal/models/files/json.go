@@ -31,6 +31,7 @@ func (e *FileError) Error() string {
 // layer - слой приложения. Используется для логирования.
 const layer = `File`
 const unmarshalErrorText = `unmarshal error`
+const marshalErrorText = `marshal error`
 
 // FileStorage - основная структура хранения.
 type FileStorage struct {
@@ -324,7 +325,7 @@ func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, 
 	var content []byte
 	content, err = json.Marshal(savedData)
 	if err != nil {
-		errBatchSet.message = `marshal error`
+		errBatchSet.message = marshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -336,7 +337,7 @@ func (fs *FileStorage) BatchSet(_ context.Context, data []byte, _ int) ([]byte, 
 
 	JSONResp, err := json.Marshal(outputData)
 	if err != nil {
-		errBatchSet.message = `marshal error`
+		errBatchSet.message = marshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -376,7 +377,7 @@ func (fs *FileStorage) HandleUserUrls(_ context.Context, _ int) ([]byte, error) 
 		var content []byte
 		content, err = json.Marshal(savedData)
 		if err != nil {
-			errHandleUserUrls.message = `marshal error`
+			errHandleUserUrls.message = marshalErrorText
 			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 		}
 		return content, nil

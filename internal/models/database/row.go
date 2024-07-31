@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
-	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
-	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/storage/db"
+	"github.com/MaximMNsk/go-url-shortener/internal/util/shorter"
+	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 )
 
 // DBError - определение ошибки слоя БД.
@@ -31,6 +32,8 @@ func (e *DBError) Error() string {
 }
 
 const layer = `DB`
+const unmarshalErrorText = `unmarshal error`
+const marshalErrorText = `marshal error`
 
 // DBStorage - структура объекта, который создается при инициализации
 // и используется для взаимодействия с хранилищем.
@@ -230,7 +233,7 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 	var savingData []inputBatch
 	err := json.Unmarshal(data, &savingData)
 	if err != nil {
-		errBatchSet.message = `unmarshal error`
+		errBatchSet.message = unmarshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -272,7 +275,7 @@ func (dbs *DBStorage) BatchSet(ctx context.Context, data []byte, userID int) ([]
 	}
 
 	if err != nil {
-		errBatchSet.message = "unmarshal error"
+		errBatchSet.message = unmarshalErrorText
 		return nil, fmt.Errorf(errBatchSet.Error()+`: %w`, err)
 	}
 
@@ -318,7 +321,7 @@ func (dbs *DBStorage) HandleUserUrls(ctx context.Context, userID int) ([]byte, e
 	if len(batchResp) > 0 {
 		JSONResp, err := json.Marshal(batchResp)
 		if err != nil {
-			errHandleUserUrls.message = "marshal error"
+			errHandleUserUrls.message = marshalErrorText
 			return nil, fmt.Errorf(errHandleUserUrls.Error()+`: %w`, err)
 		}
 		return JSONResp, nil
@@ -398,14 +401,14 @@ func explodeURLs(data string) ([]string, error) {
 	var out []string
 	err := json.Unmarshal([]byte(data), &out)
 	if err != nil {
-		errExplodeURLs.message = `unmarshal error`
+		errExplodeURLs.message = unmarshalErrorText
 		return make([]string, 0), fmt.Errorf(errExplodeURLs.Error()+`: %w`, err)
 	}
 	var uniqueResult = make(map[string]bool)
 	for _, v := range out {
 		uniqueResult[v] = false
 	}
-	var result = make([]string, 0)
+	var result = make([]string, len(uniqueResult))
 	for z := range uniqueResult {
 		result = append(result, z)
 	}
