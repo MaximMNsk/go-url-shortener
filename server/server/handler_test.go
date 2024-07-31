@@ -72,13 +72,6 @@ func TestErrorDB_Error(t *testing.T) {
 
 func TestServer_ChooseStorage(t *testing.T) {
 
-	type args struct {
-		testMode bool
-	}
-	type want struct {
-		err error
-	}
-
 	tests := []struct {
 		name string
 	}{
@@ -769,6 +762,7 @@ func ExampleServer_Init() {
 }
 
 func ExampleServer_Start() {
+	time.Sleep(100 * time.Millisecond)
 	go func() {
 		err := Serv.Start()
 		if err != nil {
