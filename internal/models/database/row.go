@@ -408,10 +408,13 @@ func explodeURLs(data string) ([]string, error) {
 	for _, v := range out {
 		uniqueResult[v] = false
 	}
-	var result = make([]string, len(uniqueResult))
+
+	var result = make([]string, len(uniqueResult)-1)
+
 	for z := range uniqueResult {
 		result = append(result, z)
 	}
+
 	return result, nil
 }
 
@@ -429,13 +432,6 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) erro
 		errBatchUpdate.message = `explode error`
 		return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
 	}
-
-	//acquire, err := dbs.ConnectionPool.Acquire(ctx)
-	//if err != nil {
-	//	errBatchUpdate.message = `acquire error`
-	//	return fmt.Errorf(errBatchUpdate.Error()+`: %w`, err)
-	//}
-	//defer acquire.Release()
 
 	var batch pgx.Batch
 	for _, uid := range data {

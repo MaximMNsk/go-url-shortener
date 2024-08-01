@@ -312,10 +312,10 @@ func TestDBStorage_BatchUpdate(t *testing.T) {
 		ConnectionPool:   mockPool,
 	}
 
-	commandTag := pgconn.NewCommandTag("INSERT 0 1")
+	commandTag := pgconn.NewCommandTag("UPDATE 0 1")
 	mockPool.
 		ExpectBatch().
-		ExpectExec(`update public.short_links set is_deleted = true where uid`).
+		ExpectExec(`update public.short_links set is_deleted = true`).
 		WithArgs(`asd`).
 		WillReturnResult(commandTag)
 	err = storage.BatchUpdate(context.Background(), `["asd"]`, 0)
