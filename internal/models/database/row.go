@@ -409,10 +409,12 @@ func explodeURLs(data string) ([]string, error) {
 		uniqueResult[v] = false
 	}
 
-	var result = make([]string, len(uniqueResult)-1)
+	var result = make([]string, len(uniqueResult))
 
+	i := 0
 	for z := range uniqueResult {
-		result = append(result, z)
+		result[i] = z
+		i++
 	}
 
 	return result, nil
