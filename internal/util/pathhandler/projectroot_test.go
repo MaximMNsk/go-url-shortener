@@ -24,6 +24,7 @@ func TestProjectRoot(t *testing.T) {
 				t.Errorf("ProjectRoot() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			require.FileExists(t, filepath.Join(got, "go.mod"))
 		})
 	}
