@@ -101,6 +101,36 @@ func (_m *Storable) Get(ctx context.Context, shortLink string) (string, bool, er
 	return r0, r1, r2
 }
 
+// HandleStats provides a mock function with given fields: ctx
+func (_m *Storable) HandleStats(ctx context.Context) ([]byte, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for HandleStats")
+	}
+
+	var r0 []byte
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) ([]byte, error)); ok {
+		return rf(ctx)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context) []byte); ok {
+		r0 = rf(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // HandleUserUrls provides a mock function with given fields: ctx, userID
 func (_m *Storable) HandleUserUrls(ctx context.Context, userID int) ([]byte, error) {
 	ret := _m.Called(ctx, userID)

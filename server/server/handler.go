@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
@@ -381,6 +382,48 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	httpResp.BadRequest(res)
 }
 
+func (s *Server) HandleStat(res http.ResponseWriter, req *http.Request) {
+	headerIP := req.Header.Get("X-Real-IP")
+	if headerIP == "" {
+		logger.PrintLog(logger.ERROR, `empty ip header`, s.LogEnabled)
+		httpResp.Forbidden(res)
+		return
+	}
+	realIP := net.ParseIP(headerIP)
+
+	_, iPPool, err := net.ParseCIDR(s.Config.Final.TrustedSubnet)
+	if err != nil {
+		logger.PrintLog(logger.WARN, `parsing error: `+err.Error(), s.LogEnabled)
+		httpResp.BadRequest(res)
+		return
+	}
+
+	if !iPPool.Contains(realIP) {
+		logger.PrintLog(logger.ERROR, `bad IP`, s.LogEnabled)
+		httpResp.Forbidden(res)
+		return
+	}
+
+	stats, err := s.Storage.HandleStats(req.Context())
+	if err != nil {
+		logger.PrintLog(logger.WARN, `DB stats error: `+err.Error(), s.LogEnabled)
+		httpResp.BadRequest(res)
+		return
+	}
+
+	if stats == nil {
+		logger.PrintLog(logger.WARN, `no data saved`, s.LogEnabled)
+		httpResp.NoContent(res, httpResp.Additional{})
+		return
+	}
+
+	httpResp.OkAdditionalJSON(res, httpResp.Additional{
+		Place:     "body",
+		OuterData: "",
+		InnerData: string(stats),
+	})
+}
+
 // HandleOther - middleware для обработки неожидаемых запросов.
 func HandleOther(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -402,7 +445,8 @@ func (s *Server) ChooseStorage(ctx context.Context, conf confModule.OuterConfig)
 		parentFuncName: `-`,
 	}
 
-	if conf.Env.DB != "" || conf.Flag.DB != "" {
+	if conf.Env.DB != "" || conf.Flag.DB != "" || conf.ConfFile.DB != "" {
+		logger.PrintLog(logger.INFO, `DB storage`, s.LogEnabled)
 		pgPool, err := db.NewPool(ctx, conf)
 		if err != nil {
 			return err
@@ -421,7 +465,8 @@ func (s *Server) ChooseStorage(ctx context.Context, conf confModule.OuterConfig)
 		return nil
 	}
 
-	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` {
+	if conf.Env.LinkFile != `` || conf.Flag.LinkFile != `` || conf.ConfFile.LinkFile != `` {
+		logger.PrintLog(logger.INFO, `File storage`, s.LogEnabled)
 		s.Storage = &files.FileStorage{
 			Cfg: conf,
 		}
@@ -433,6 +478,7 @@ func (s *Server) ChooseStorage(ctx context.Context, conf confModule.OuterConfig)
 		return nil
 	}
 
+	logger.PrintLog(logger.INFO, `InMem storage`, s.LogEnabled)
 	s.Storage = &memory.MemStorage{
 		Storage: memoryStorage.Storage{},
 		Cfg:     conf,
@@ -505,6 +551,7 @@ func (s *Server) Start() error {
 			r.Post(`/api/shorten/{query}`, s.HandleAPIBatch)
 			r.Get(`/ping`, s.HandlePing)
 			r.Get(`/{query}`, s.HandleGET)
+			r.Get(`/api/internal/stats`, s.HandleStat)
 		})
 		s.Routers.Group(func(r chi.Router) {
 			r.Use(cookie.AuthChecker)

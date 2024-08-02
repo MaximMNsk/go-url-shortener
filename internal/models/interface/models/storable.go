@@ -38,6 +38,8 @@ type Storable interface {
 	// переданные в структуре объекта. Передает данные в канал.
 	HandleUserUrlsDelete(links string, userID int)
 
+	HandleStats(ctx context.Context) ([]byte, error)
+
 	// AsyncSaver - асинхронно сохраняет инфо, переданную в канал методом HandleUserUrlsDelete.
 	// Работает как демон.
 	AsyncSaver()
