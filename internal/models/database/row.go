@@ -84,6 +84,12 @@ select original_url, is_deleted from public.short_links where (uid = $1 or origi
 const selectAllRows = `
 select original_url, short_url from public.short_links where user_id = $1`
 
+const selectStats = `
+select
+    count(distinct user_id) as users,
+    count(distinct original_url) as urls
+from public.short_links`
+
 //const updateRow = `
 //update public.short_links set is_deleted = true where uid = $1 and user_id = $2`
 
@@ -456,4 +462,45 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) erro
 	}
 
 	return err
+}
+
+type Stats struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
+}
+
+// HandleStats - возвращает статистику по кол-ву сокращенных УРЛ и пользователей.
+func (dbs *DBStorage) HandleStats(ctx context.Context) ([]byte, error) {
+	if dbs.ConnectionPool == nil {
+		return nil, fmt.Errorf(`%w`, &DBError{
+			layer:          layer,
+			parentFuncName: `-`,
+			funcName:       `Get`,
+			message:        poolIsNilError,
+		})
+	}
+	getErr := DBError{
+		layer:          layer,
+		parentFuncName: `-`,
+		funcName:       `Get`,
+		message:        `Error occurred`,
+	}
+
+	s := new(Stats)
+
+	row := dbs.ConnectionPool.QueryRow(ctx, selectStats)
+
+	err := row.Scan(&s.Users, &s.URLs)
+	if err != nil {
+		getErr.message = fmt.Sprintf(`Error: %v`, err)
+		return nil, &getErr
+	}
+
+	result, err := json.Marshal(s)
+	if err != nil {
+		getErr.message = fmt.Sprintf(`Error: %v`, err)
+		return nil, &getErr
+	}
+
+	return result, nil
 }

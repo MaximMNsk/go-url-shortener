@@ -218,3 +218,8 @@ func (ms *MemStorage) AsyncSaver() {
 		ms.AsyncSaverStatCh <- errAsyncSaver
 	}
 }
+
+// HandleStats - возвращает статистику по кол-ву сокращенных УРЛ и пользователей.
+func (ms *MemStorage) HandleStats(_ context.Context) ([]byte, error) {
+	return nil, nil
+}

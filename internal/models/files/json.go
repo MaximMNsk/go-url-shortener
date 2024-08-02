@@ -403,3 +403,8 @@ func (fs *FileStorage) AsyncSaver() {
 		fs.AsyncSaverStatCh <- errAsyncSaver
 	}
 }
+
+// HandleStats - возвращает статистику по кол-ву сокращенных УРЛ и пользователей.
+func (fs *FileStorage) HandleStats(_ context.Context) ([]byte, error) {
+	return nil, nil
+}

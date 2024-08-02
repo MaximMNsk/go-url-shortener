@@ -28,39 +28,44 @@ type OuterConfig struct {
 			KeyFile  string
 			CertFile string
 		}
-		AppAddr      string
-		ShortURLAddr string
-		LinkFile     string
-		DB           string
+		AppAddr       string
+		ShortURLAddr  string
+		LinkFile      string
+		DB            string
+		TrustedSubnet string
 	}
 	Env struct {
-		IsSecure     bool   `env:"ENABLE_HTTPS"`
-		AppAddr      string `env:"SERVER_ADDRESS"`
-		ShortURLAddr string `env:"BASE_URL"`
-		LinkFile     string `env:"FILE_STORAGE_PATH"`
-		DB           string `env:"DATABASE_DSN"`
+		IsSecure      bool   `env:"ENABLE_HTTPS"`
+		AppAddr       string `env:"SERVER_ADDRESS"`
+		ShortURLAddr  string `env:"BASE_URL"`
+		LinkFile      string `env:"FILE_STORAGE_PATH"`
+		DB            string `env:"DATABASE_DSN"`
+		TrustedSubnet string `env:"TRUSTED_SUBNET"`
 	}
 	Flag struct {
-		IsSecure     bool
-		AppAddr      string
-		ShortURLAddr string
-		LinkFile     string
-		DB           string
+		IsSecure      bool
+		AppAddr       string
+		ShortURLAddr  string
+		LinkFile      string
+		DB            string
+		TrustedSubnet string
 	}
 	ConfFile struct {
-		Path         string
-		IsSecure     bool   `json:"enable_https"`
-		AppAddr      string `json:"server_address"`
-		ShortURLAddr string `json:"base_url"`
-		LinkFile     string `json:"file_storage_path"`
-		DB           string `json:"database_dsn"`
+		Path          string
+		IsSecure      bool   `json:"enable_https"`
+		AppAddr       string `json:"server_address"`
+		ShortURLAddr  string `json:"base_url"`
+		LinkFile      string `json:"file_storage_path"`
+		DB            string `json:"database_dsn"`
+		TrustedSubnet string `json:"trusted_subnet"`
 	}
 	Final struct {
-		IsSecure     bool
-		AppAddr      string
-		ShortURLAddr string
-		LinkFile     string
-		DB           string
+		IsSecure      bool
+		AppAddr       string
+		ShortURLAddr  string
+		LinkFile      string
+		DB            string
+		TrustedSubnet string
 	}
 }
 
@@ -73,6 +78,7 @@ func (config *OuterConfig) parseFlags() {
 	flag.StringVar(&config.Flag.DB, "d", "", "db connection")
 	flag.StringVar(&config.ConfFile.Path, "c", "", "config file path")
 	flag.BoolVar(&config.Flag.IsSecure, "s", false, "secure connection")
+	flag.StringVar(&config.ConfFile.Path, "t", "", "trusted subnet")
 	flag.Parse()
 }
 
@@ -116,6 +122,7 @@ func (config *OuterConfig) setDefaults() error {
 	config.Default.Cert.KeyFile = filepath.Join(rootPath, "cmd/shortener/secure/privateKey.key")
 	config.Default.LinkFile = filepath.Join(rootPath, "internal/storage/files/links.json")
 	config.Default.DB = "postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable"
+	config.Default.TrustedSubnet = "127.0.0.1/24"
 	//Config.Default.DB = "user=postgres password=12345 dbname=postgres sslmode=disable"
 	return err
 }
@@ -224,6 +231,17 @@ func (config *OuterConfig) InitConfig(testMode bool) error {
 		config.Final.DB = config.ConfFile.DB
 	default:
 		config.Final.DB = config.Default.DB
+	}
+
+	switch {
+	case config.Flag.TrustedSubnet != "":
+		config.Final.TrustedSubnet = config.Flag.TrustedSubnet
+	case config.Env.TrustedSubnet != "":
+		config.Final.TrustedSubnet = config.Env.TrustedSubnet
+	case config.ConfFile.TrustedSubnet != "":
+		config.Final.TrustedSubnet = config.ConfFile.TrustedSubnet
+	default:
+		config.Final.TrustedSubnet = config.Default.TrustedSubnet
 	}
 
 	err = config.handleFinal()

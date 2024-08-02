@@ -53,6 +53,12 @@ func Conflict(w http.ResponseWriter, addData Additional) {
 	successAnswer(w, http.StatusConflict, addData)
 }
 
+// Forbidden - отдает по http статус 403.
+func Forbidden(w http.ResponseWriter) {
+	addData := Additional{}
+	successAnswer(w, http.StatusForbidden, addData)
+}
+
 func successAnswerJSON(w http.ResponseWriter, status int, additionalData Additional) {
 	w.Header().Add("Content-Type", "application/json")
 	if additionalData.Place == "header" {
