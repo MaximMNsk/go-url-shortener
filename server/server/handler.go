@@ -382,6 +382,7 @@ func (s *Server) HandlePing(res http.ResponseWriter, req *http.Request) {
 	httpResp.BadRequest(res)
 }
 
+// HandleStat - метод отображения статистики.
 func (s *Server) HandleStat(res http.ResponseWriter, req *http.Request) {
 	headerIP := req.Header.Get("X-Real-IP")
 	if headerIP == "" {

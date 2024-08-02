@@ -464,6 +464,7 @@ func (dbs *DBStorage) BatchUpdate(ctx context.Context, links string, _ int) erro
 	return err
 }
 
+// Stats - структура для создания JSON-ответа.
 type Stats struct {
 	URLs  int `json:"urls"`
 	Users int `json:"users"`
