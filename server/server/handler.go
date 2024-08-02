@@ -11,6 +11,10 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
+
 	"github.com/MaximMNsk/go-url-shortener/internal/models/database"
 	"github.com/MaximMNsk/go-url-shortener/internal/models/files"
 	model "github.com/MaximMNsk/go-url-shortener/internal/models/interface/models"
@@ -25,9 +29,6 @@ import (
 	"github.com/MaximMNsk/go-url-shortener/server/compress"
 	confModule "github.com/MaximMNsk/go-url-shortener/server/config"
 	httpResp "github.com/MaximMNsk/go-url-shortener/server/http"
-	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // HandlersError - тип для работы с ошибками слоя обработчиков.
