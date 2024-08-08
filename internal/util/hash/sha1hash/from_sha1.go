@@ -1,3 +1,4 @@
+// Package sha1hash - генератор хэша.
 package sha1hash
 
 import (
@@ -5,8 +6,10 @@ import (
 	"encoding/hex"
 )
 
+// Create - создает хэш-строку заданной длины из входной строки.
 func Create(input string, len int) string {
 	h := sha1.New()
+
 	h.Write([]byte(input))
 	sha1Hash := hex.EncodeToString(h.Sum(nil))
 
