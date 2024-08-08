@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -750,6 +751,137 @@ func TestServer_HandleAPIUserUrlsDelete(t *testing.T) {
 
 			Serv.HandleAPIUserUrlsDelete(resp, request)
 			assert.Equal(t, tt.want.resp, resp.Code)
+		})
+	}
+}
+
+func TestServer_HandleStat(t *testing.T) {
+	type args struct {
+		addr           string
+		IP             string
+		allowedSubnet  string
+		method         string
+		HandleStatsRes []byte
+		HandleStatsErr error
+	}
+	type want struct {
+		resp int
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: `Test empty IP`, // Не пришел IP
+			args: args{
+				addr:          Cfg.Final.AppAddr,
+				method:        http.MethodGet,
+				IP:            ``,
+				allowedSubnet: ``,
+			},
+			want: want{
+				resp: http.StatusForbidden,
+			},
+		},
+		{
+			name: `Test wrong subnet`, // Некорректно задана доверенная подсеть
+			args: args{
+				addr:          Cfg.Final.AppAddr,
+				method:        http.MethodGet,
+				IP:            `192.168.0.1`,
+				allowedSubnet: `net/24`,
+			},
+			want: want{
+				resp: http.StatusBadRequest,
+			},
+		},
+		{
+			name: `Test foreign IP`, // IP не из доверенной подсети
+			args: args{
+				addr:          Cfg.Final.AppAddr,
+				method:        http.MethodGet,
+				IP:            `192.168.0.1`,
+				allowedSubnet: `127.0.0.1/24`,
+			},
+			want: want{
+				resp: http.StatusForbidden,
+			},
+		},
+		{
+			name: `Test invalid query`, // Запрос к моку возвращает ошибку
+			args: args{
+				addr:           Cfg.Final.AppAddr,
+				method:         http.MethodGet,
+				IP:             `127.0.0.1`,
+				allowedSubnet:  `127.0.0.1/24`,
+				HandleStatsRes: nil,
+				HandleStatsErr: errors.New(`some error`),
+			},
+			want: want{
+				resp: http.StatusBadRequest,
+			},
+		},
+		{
+			name: `Test empty data`, // В БД нет статистики
+			args: args{
+				addr:           Cfg.Final.AppAddr,
+				method:         http.MethodGet,
+				IP:             `127.0.0.1`,
+				allowedSubnet:  `127.0.0.1/24`,
+				HandleStatsRes: nil,
+				HandleStatsErr: nil,
+			},
+			want: want{
+				resp: http.StatusNoContent,
+			},
+		},
+		{
+			name: `Test valid`, // Успех
+			args: args{
+				addr:           Cfg.Final.AppAddr,
+				method:         http.MethodGet,
+				IP:             `127.0.0.1`,
+				allowedSubnet:  `127.0.0.1/24`,
+				HandleStatsRes: []byte(`{"urls":"10","users":"1"}`),
+				HandleStatsErr: nil,
+			},
+			want: want{
+				resp: http.StatusOK,
+			},
+		},
+	}
+
+	// о859оо 154
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.name == "Test invalid query" || tt.name == "Test empty data" || tt.name == "Test valid" {
+				storageMock := mocks.NewStorable(t)
+				storageMock.
+					On(`HandleStats`, mock.Anything).
+					Return(tt.args.HandleStatsRes, tt.args.HandleStatsErr)
+				Serv.Storage = storageMock
+			}
+
+			Serv.Config.Final.TrustedSubnet = tt.args.allowedSubnet
+
+			resp := httptest.NewRecorder()
+
+			request, err := http.NewRequest(tt.args.method, `http://`+tt.args.addr+`/api/user/urls`, nil)
+			request.Header.Set(`X-Real-IP`, tt.args.IP)
+
+			require.NoError(t, err)
+
+			Serv.HandleStat(resp, request)
+			assert.Equal(t, tt.want.resp, resp.Code)
+
+			if tt.name == "Test valid" {
+				body, err := io.ReadAll(resp.Body)
+				require.NoError(t, err)
+				require.Equal(t, tt.args.HandleStatsRes, body)
+			}
 		})
 	}
 }
