@@ -72,13 +72,27 @@ type OuterConfig struct {
 // parseFlags обрабатывает аргументы командной строки
 // и сохраняет их значения в соответствующих переменных.
 func (config *OuterConfig) parseFlags() {
-	flag.StringVar(&config.Flag.AppAddr, "a", "", "address and port to run server")
-	flag.StringVar(&config.Flag.ShortURLAddr, "b", "", "address and port to short link")
-	flag.StringVar(&config.Flag.LinkFile, "f", "", "path to file with links")
-	flag.StringVar(&config.Flag.DB, "d", "", "db connection")
-	flag.StringVar(&config.ConfFile.Path, "c", "", "config file path")
-	flag.BoolVar(&config.Flag.IsSecure, "s", false, "secure connection")
-	flag.StringVar(&config.ConfFile.Path, "t", "", "trusted subnet")
+	if flag.Lookup(`a`) == nil {
+		flag.StringVar(&config.Flag.AppAddr, "a", "", "address and port to run server")
+	}
+	if flag.Lookup(`b`) == nil {
+		flag.StringVar(&config.Flag.ShortURLAddr, "b", "", "address and port to short link")
+	}
+	if flag.Lookup(`f`) == nil {
+		flag.StringVar(&config.Flag.LinkFile, "f", "", "path to file with links")
+	}
+	if flag.Lookup(`d`) == nil {
+		flag.StringVar(&config.Flag.DB, "d", "", "db connection")
+	}
+	if flag.Lookup(`c`) == nil {
+		flag.StringVar(&config.ConfFile.Path, "c", "", "config file path")
+	}
+	if flag.Lookup(`s`) == nil {
+		flag.BoolVar(&config.Flag.IsSecure, "s", false, "secure connection")
+	}
+	if flag.Lookup(`t`) == nil {
+		flag.StringVar(&config.ConfFile.Path, "t", "", "trusted subnet")
+	}
 	flag.Parse()
 }
 
@@ -135,9 +149,9 @@ func (config *OuterConfig) parseEnv() error {
 	return err
 }
 
-// parseConfigFile разбирает файл конфигурации
+// ParseConfigFile разбирает файл конфигурации
 // и сохраняет данные соответствующей структуре.
-func (config *OuterConfig) parseConfigFile() error {
+func (config *OuterConfig) ParseConfigFile() error {
 	data, err := os.ReadFile(config.ConfFile.Path)
 	if err != nil {
 		return err
@@ -171,7 +185,7 @@ func (config *OuterConfig) InitConfig(testMode bool) error {
 		config.parseFlags()
 
 		if len(config.ConfFile.Path) != 0 {
-			err = config.parseConfigFile()
+			err = config.ParseConfigFile()
 			if err != nil {
 				return err
 			}

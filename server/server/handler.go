@@ -91,7 +91,7 @@ func (s *Server) HandleGET(res http.ResponseWriter, req *http.Request) {
 	httpResp.BadRequest(res)
 }
 
-// HandlePOST - принимает запрос, наполняет объект данными, выполняет запрос к хранилищу.
+// HandlePOST - принимает данные клиента и выполняет запрос к хранилищу.
 // Эндпоинт с методом POST и путём /.
 // Сервер принимает в теле запроса строку URL как text/plain
 // и возвращает ответ с кодом 201 и сокращённым URL как text/plain.
