@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package shortener;
+
+option go_package = "shortener/proto";
+
+enum Result {
+  HTTP_200_OK = 0;
+  HTTP_201_CREATED = 1;
+  HTTP_202_ACCEPTED = 2;
+  HTTP_204_NO_CONTENT = 3;
+  HTTP_307_TMP_REDIRECT = 4;
+  HTTP_400_BAD_REQUEST = 5;
+  HTTP_401_UNAUTHORIZED = 6;
+  HTTP_403_FORBIDDEN = 7;
+  HTTP_409_CONFLICT = 8;
+  HTTP_410_GONE = 9;
+  HTTP_500_INTERNAL_ERROR = 10;
+  HTTP_503_UNAVAILABLE = 11;
+}
+
+
+message GetShortRequest {
+  string shortURL = 1;
+}
+message GetShortResponse {
+  Result result = 1;
+  string data = 2;
+}
+
+
+message SetShortRequest {
+  string originalURL = 1;
+}
+message SetShortResponse {
+  Result result = 1;
+  string data = 2;
+}
+
+
+message APIUserURLsDeleteRequest {
+  repeated string URL = 1;
+}
+message APIUserURLsDeleteResponse {
+  Result result = 1;
+}
+
+
+message APIUserUrlsRequest {
+}
+message UserURL {
+    string short_url = 1;
+    string original_url = 2;
+}
+message APIUserUrlsResponse {
+  Result result = 1;
+  repeated UserURL data = 2;
+}
+
+
+message BeforeShort {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+message APIBatchRequest {
+  repeated BeforeShort URLs = 1;
+}
+message AfterShort {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+message APIBatchResponse {
+  Result result = 1;
+  repeated AfterShort shortURLs = 2;
+}
+
+
+message InputURL {
+  string url = 1;
+}
+message APIShortenRequest {
+  InputURL URL = 1;
+}
+message OutputURL {
+  string result = 1;
+}
+message APIShortenResponse {
+  Result result = 1;
+  OutputURL shorten = 2;
+}
+
+
+message PingRequest {}
+message PingResponse {
+  Result result = 1;
+}
+
+
+message StatRequest {}
+message Stats {
+  int32 urls = 1;
+  int32 users = 2;
+}
+message StatResponse {
+  Result result = 1;
+  Stats stats = 2;
+}
+
+service Shortener {
+  rpc Ping(PingRequest) returns (PingResponse);
+  rpc GetShort(GetShortRequest) returns (GetShortResponse);
+  rpc SetShort(SetShortRequest) returns (SetShortResponse);
+  rpc APIUserURLsDelete(APIUserURLsDeleteRequest) returns (APIUserURLsDeleteResponse);
+  rpc APIUserUrls(APIUserUrlsRequest) returns (APIUserUrlsResponse);
+  rpc APIBatch(APIBatchRequest) returns (APIBatchResponse);
+  rpc APIShorten(APIShortenRequest) returns (APIShortenResponse);
+  rpc Stat(StatRequest) returns (StatResponse);
+}

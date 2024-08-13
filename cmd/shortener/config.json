@@ -1,0 +1,8 @@
+{
+  "server_address": "localhost:8080",
+  "base_url": "http://localhost",
+  "file_storage_path": "",
+  "database_dsn": "postgresql://postgres@127.0.0.1:5432/postgres?sslmode=disable",
+  "enable_https": false,
+  "trusted_subnet": "127.0.0.1/24"
+}

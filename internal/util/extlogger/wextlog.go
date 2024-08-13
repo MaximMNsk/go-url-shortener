@@ -1,16 +1,23 @@
+// Package extlogger - middleware для перехвата и записи логов запроса.
 package extlogger
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
+
+	"github.com/rs/zerolog"
+
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 )
 
+// Header - для переопределения заголовков.
 type Header http.Header
 
+// ResponseWriter - интерфейс, который определяет структуру пакета.
 type ResponseWriter interface {
 	Header() Header
 	Write([]byte) (int, error)
@@ -25,27 +32,32 @@ type (
 
 	// добавляем реализацию http.ResponseWriter
 	loggingResponseWriter struct {
-		http.ResponseWriter // встраиваем оригинальный http.ResponseWriter
-		responseData        *responseData
+		// встраиваем оригинальный http.ResponseWriter
+		http.ResponseWriter
+		responseData *responseData
 	}
 )
 
+// Write - записывает ответ, используя оригинальный ResponseWriter,
+// возвращает размер записанных данных и ошибку.
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
-	// записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
-	r.responseData.size += size // захватываем размер
+	// захватываем размер
+	r.responseData.size += size
 	return size, err
 }
 
+// WriteHeader - записывает код статуса, используя оригинальный ResponseWriter
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
-	// записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
-	r.responseData.status = statusCode // захватываем код статуса
+	// захватываем код статуса
+	r.responseData.status = statusCode
 }
+
+// Log - непосредственно, метод логирования на базе zerolog.
 func Log(h http.Handler) http.Handler {
 	logFn := func(w http.ResponseWriter, r *http.Request) {
 		log := zerolog.New(os.Stdout).With().
-			//Timestamp().
 			Logger()
 
 		start := time.Now()
@@ -55,10 +67,12 @@ func Log(h http.Handler) http.Handler {
 			size:   0,
 		}
 		lw := loggingResponseWriter{
-			ResponseWriter: w, // встраиваем оригинальный http.ResponseWriter
+			// встраиваем оригинальный http.ResponseWriter
+			ResponseWriter: w,
 			responseData:   responseData,
 		}
-		h.ServeHTTP(&lw, r) // внедряем реализацию http.ResponseWriter
+		// внедряем реализацию http.ResponseWriter
+		h.ServeHTTP(&lw, r)
 
 		duration := time.Since(start).Seconds()
 		scheme := ""
@@ -70,6 +84,12 @@ func Log(h http.Handler) http.Handler {
 
 		body, _ := io.ReadAll(r.Body)
 
+		var UserID cookie.UserNum
+		token, err := r.Cookie("token")
+		if err == nil {
+			UserID = cookie.UserNum(strconv.Itoa(cookie.GetUserID(token.Value)))
+		}
+
 		log.Info().
 			Time("StartTime", start).
 			Float64("Duration", duration).
@@ -79,9 +99,15 @@ func Log(h http.Handler) http.Handler {
 			Str("Content-Encoding", r.Header.Get("Content-Encoding")).
 			Str("Body", string(body)).
 			Str("URL", fmt.Sprintf("%s%s%s", scheme, r.Host, r.URL.Path)).
+			Str("UserID", string(UserID)).
 			Int("Status", responseData.status).
 			Int("Size", responseData.size).
 			Send()
+
+		err = r.Body.Close()
+		if err != nil {
+			return
+		}
 	}
 	return http.HandlerFunc(logFn)
 }
