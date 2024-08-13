@@ -5,13 +5,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/MaximMNsk/go-url-shortener/internal/models/interface/models/mocks"
-	pb "github.com/MaximMNsk/go-url-shortener/proto"
-	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/models/interface/models/mocks"
+	pb "github.com/MaximMNsk/go-url-shortener/proto"
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 )
 
 func TestShortenerServer_Ping(t *testing.T) {
@@ -518,7 +519,7 @@ func TestShortenerServer_APIBatch(t *testing.T) {
 			args: args{
 				ctx: context.WithValue(context.Background(), cookie.UserNum(`UserID`), -1),
 				input: []*pb.BeforeShort{
-					&pb.BeforeShort{
+					{
 						CorrelationId: `00ea1da4`,
 						OriginalUrl:   `asdasdasd`,
 					},
@@ -540,7 +541,7 @@ func TestShortenerServer_APIBatch(t *testing.T) {
 			args: args{
 				ctx: context.WithValue(context.Background(), cookie.UserNum(`UserID`), -1),
 				input: []*pb.BeforeShort{
-					&pb.BeforeShort{
+					{
 						CorrelationId: `00ea1da4`,
 						OriginalUrl:   `asdasdasd`,
 					},
@@ -555,7 +556,7 @@ func TestShortenerServer_APIBatch(t *testing.T) {
 				resp: pb.APIBatchResponse{
 					Result: pb.Result_HTTP_200_OK,
 					ShortURLs: []*pb.AfterShort{
-						&pb.AfterShort{
+						{
 							CorrelationId: `00ea1da4`,
 							ShortUrl:      `http://localhost:8080/00ea1da4`,
 						},
@@ -620,12 +621,12 @@ func TestShortenerServer_APIShorten(t *testing.T) {
 			args: args{
 				ctx: context.WithValue(context.Background(), cookie.UserNum(`UserID`), -1),
 				input: []*pb.InputURL{
-					&pb.InputURL{
+					{
 						Url: `asdasdasd`,
 					},
 				},
 				output: []*pb.OutputURL{
-					&pb.OutputURL{
+					{
 						Result: `http://localhost:8080/00ea1da4`,
 					},
 				},
@@ -644,12 +645,12 @@ func TestShortenerServer_APIShorten(t *testing.T) {
 			args: args{
 				ctx: context.WithValue(context.Background(), cookie.UserNum(`UserID`), -1),
 				input: []*pb.InputURL{
-					&pb.InputURL{
+					{
 						Url: `asdasdasd`,
 					},
 				},
 				output: []*pb.OutputURL{
-					&pb.OutputURL{
+					{
 						Result: `http://localhost:8080/da39a3ee`,
 					},
 				},
@@ -761,7 +762,7 @@ func TestShortenerServer_APIUserUrls(t *testing.T) {
 				resp: pb.APIUserUrlsResponse{
 					Result: pb.Result_HTTP_200_OK,
 					Data: []*pb.UserURL{
-						&pb.UserURL{
+						{
 							ShortUrl:    `http://localhost:8080/00ea1da4`,
 							OriginalUrl: `asdasdasd`,
 						},

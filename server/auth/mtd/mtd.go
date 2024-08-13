@@ -5,9 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/MaximMNsk/go-url-shortener/server/auth/cookie"
 )
 
 // BuildJWTString создаёт токен и возвращает его в виде строки.
