@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -41,6 +42,7 @@ type ShortenerServer struct {
 	GRPC            *grpc.Server
 	LogEnabled      bool
 	ShutdownProcess bool
+	Mu              sync.RWMutex
 }
 
 // GetShort - метод получения URL из ShortURL.

@@ -1,12 +1,13 @@
 package http
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBadRequest(t *testing.T) {
@@ -505,6 +506,47 @@ func TestGone(t *testing.T) {
 			bodyResult, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want.addData, string(bodyResult))
+
+			_ = result.Body.Close()
+		})
+	}
+}
+
+func TestForbidden(t *testing.T) {
+	type args struct {
+		addData Additional
+	}
+
+	type want struct {
+		addData string
+		status  int
+	}
+
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "Gone",
+			args: args{
+				addData: Additional{Place: `body`, InnerData: `Some text`},
+			},
+			want: want{
+				status:  http.StatusForbidden,
+				addData: `Some text`,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			Forbidden(w)
+			result := w.Result()
+			assert.Equal(t, tt.want.status, result.StatusCode)
+
+			_, err := io.ReadAll(result.Body)
+			require.NoError(t, err)
 
 			_ = result.Body.Close()
 		})

@@ -24,7 +24,7 @@ func TestShortenerServer_Ping(t *testing.T) {
 		err  error
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -104,7 +104,7 @@ func TestShortenerServer_Stat(t *testing.T) {
 		resp pb.StatResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -276,7 +276,7 @@ func TestShortenerServer_SetShort(t *testing.T) {
 		resp pb.SetShortResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -373,7 +373,7 @@ func TestShortenerServer_GetShort(t *testing.T) {
 		resp pb.GetShortResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -508,7 +508,7 @@ func TestShortenerServer_APIBatch(t *testing.T) {
 		resp pb.APIBatchResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -600,7 +600,7 @@ func TestShortenerServer_APIShorten(t *testing.T) {
 		input         []*pb.InputURL
 		output        []*pb.OutputURL
 		mockNeed      bool
-		mockUrl       string
+		mockURL       string
 		mockError     error
 		mockResult    []byte
 		mockIsDeleted bool
@@ -610,7 +610,7 @@ func TestShortenerServer_APIShorten(t *testing.T) {
 		resp pb.APIShortenResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -677,14 +677,14 @@ func TestShortenerServer_APIShorten(t *testing.T) {
 			if tt.args.mockNeed {
 				storageMock := mocks.NewStorable(t)
 				storageMock.
-					On(`Set`, tt.args.ctx, tt.args.mockUrl, mock.Anything, mock.Anything, mock.Anything).
+					On(`Set`, tt.args.ctx, tt.args.mockURL, mock.Anything, mock.Anything, mock.Anything).
 					Return(tt.args.mockError)
 				serv.Storage = storageMock
 			}
 
 			resp, err := serv.APIShorten(tt.args.ctx, &pb.APIShortenRequest{
 				URL: &pb.InputURL{
-					Url: tt.args.mockUrl,
+					Url: tt.args.mockURL,
 				},
 			})
 
@@ -711,7 +711,7 @@ func TestShortenerServer_APIUserUrls(t *testing.T) {
 		resp pb.APIUserUrlsResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want
@@ -811,7 +811,7 @@ func TestShortenerServer_APIUserURLsDelete(t *testing.T) {
 		resp pb.APIUserURLsDeleteResponse
 	}
 
-	tests := []struct {
+	tests := []*struct {
 		name string
 		args args
 		want want

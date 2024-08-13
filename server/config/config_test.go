@@ -1,10 +1,13 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/MaximMNsk/go-url-shortener/internal/util/pathhandler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 func TestHandleConfig(t *testing.T) {
@@ -56,4 +59,14 @@ func TestHandleConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestOuterConfig_ParseConfigFile(t *testing.T) {
+	root, err := pathhandler.ProjectRoot()
+	require.NoError(t, err)
+	file := filepath.Join(root, `cmd/shortener/config.json`)
+	cfg := OuterConfig{}
+	cfg.ConfFile.Path = file
+	err = cfg.ParseConfigFile()
+	require.NoError(t, err)
 }
